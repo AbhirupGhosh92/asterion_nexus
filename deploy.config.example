@@ -1,0 +1,24 @@
+# Copy to `deploy.config`, fill in, then run ./deploy.sh
+# (deploy.config is gitignored — your values never reach the repo.)
+
+# Your GCP project (billing must be enabled).
+PROJECT_ID="your-gcp-project"
+REGION="us-central1"
+
+# Firebase Hosting site for the UI (created automatically if missing).
+# The app will live at https://<FIREBASE_SITE>.web.app
+FIREBASE_SITE="my-nexus"
+
+# Comma-separated emails that get the admin panel.
+ADMIN_EMAILS="you@example.com"
+
+# Firebase Storage bucket (the default bucket is created automatically).
+STORAGE_BUCKET="your-gcp-project.firebasestorage.app"
+
+# ---------------------------------------------------------------------------
+# Dify agent engine in the cloud (OPTIONAL — this is the one non-serverless
+# piece; it runs on a small always-on VM: ~$25-50/month depending on size).
+# false = skip; agents simply don't appear in the model selector.
+# ---------------------------------------------------------------------------
+WITH_DIFY="false"
+DIFY_MACHINE_TYPE="e2-standard-2"   # 8 GB RAM recommended; e2-medium (4 GB) is the floor

@@ -1,0 +1,65 @@
+/* ==========================================================================
+   Cyberpunk theme tokens — single source of truth for the UI.
+   Use with Tailwind (map these vars in tailwind.config) or plain CSS.
+   ========================================================================== */
+
+:root {
+  /* Base surfaces — deep night, slightly blue */
+  --bg-void: #07070f;
+  --bg-panel: #0d0e1a;
+  --bg-raised: #14162a;
+  --border-dim: #232647;
+
+  /* Neon accents — use sparingly: one primary, one hot highlight */
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff2ea6;
+  --neon-lime: #b6ff2e;
+  --neon-amber: #ffb52e;
+
+  /* Text */
+  --text-primary: #e8eaff;
+  --text-dim: #8b90b8;
+  --text-glow: var(--neon-cyan);
+
+  /* Effects */
+  --glow-sm: 0 0 6px;
+  --glow-md: 0 0 14px;
+  --scanline: repeating-linear-gradient(
+    0deg, transparent 0 2px, rgba(0, 240, 255, 0.02) 2px 4px
+  );
+
+  --font-display: "Orbitron", "Rajdhani", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+body {
+  background: var(--bg-void);
+  background-image: var(--scanline);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+/* Signature elements */
+.neon-border {
+  border: 1px solid var(--neon-cyan);
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 60%, transparent),
+              inset 0 0 12px rgba(0, 240, 255, 0.06);
+}
+
+.glitch-hover:hover {
+  text-shadow: 2px 0 var(--neon-magenta), -2px 0 var(--neon-cyan);
+}
+
+.terminal-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: var(--glow-sm) var(--neon-cyan); }
+  50% { box-shadow: var(--glow-md) var(--neon-cyan); }
+}
+.thinking-indicator { animation: pulse-glow 1.6s ease-in-out infinite; }

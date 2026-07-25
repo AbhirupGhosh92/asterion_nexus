@@ -1,0 +1,36 @@
+# --- secrets: never commit ---
+backend/.env
+frontend/.env.local
+infra/dify-vertex-sa.json
+*.pem
+*-sa.json
+
+# --- python ---
+backend/.venv/
+__pycache__/
+*.pyc
+
+# --- node ---
+frontend/node_modules/
+frontend/dist/
+
+# --- terraform (state contains resource details) ---
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform.lock.hcl
+
+# --- vendored dify clone (13k files; re-clone: git clone --depth 1 https://github.com/langgenius/dify infra/dify) ---
+infra/dify/
+
+# --- runtime junk ---
+logs/
+.pids/
+nohup.out
+.DS_Store
+docs/*.docx
+.claude/settings.local.json
+frontend/.firebase/
+deploy.config
+CLAUDE.local.md
+frontend/.firebaserc
