@@ -151,10 +151,23 @@ deploy_backend() {
   fi
 }
 
+restore_firebase_json() {
+  # firebase.json is tracked; put back whatever was in "site" so deploying
+  # never leaves your site name sitting in a dirty git tree.
+  [[ -n "${_FIREBASE_JSON_BACKUP:-}" && -f "$_FIREBASE_JSON_BACKUP" ]] || return 0
+  mv "$_FIREBASE_JSON_BACKUP" frontend/firebase.json
+  unset _FIREBASE_JSON_BACKUP
+}
+
 deploy_frontend() {
   say "Building + deploying frontend to site '$FIREBASE_SITE'…"
   [[ -f frontend/.env.local ]] || warn "frontend/.env.local missing — copy frontend/.env.example and fill in your Firebase web app config first"
   printf '{\n  "projects": { "default": "%s" }\n}\n' "$PROJECT_ID" > frontend/.firebaserc
+
+  _FIREBASE_JSON_BACKUP="${TMPDIR:-/tmp}/nexus_firebase_json.bak"
+  cp frontend/firebase.json "$_FIREBASE_JSON_BACKUP"
+  trap restore_firebase_json EXIT   # restore even if the deploy fails
+
   python3 - "$FIREBASE_SITE" <<'PY'
 import json, sys
 cfg = json.load(open("frontend/firebase.json"))
@@ -163,6 +176,8 @@ json.dump(cfg, open("frontend/firebase.json", "w"), indent=2)
 PY
   ( cd frontend && npm install --silent && npm run build ) > /dev/null
   ( cd frontend && npx --yes firebase-tools deploy --only hosting --project "$PROJECT_ID" ) | tail -3
+  restore_firebase_json
+  trap - EXIT
   ok "Hosting deployed"
 }
 
