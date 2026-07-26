@@ -1,0 +1,20 @@
+# What NOT to upload to Cloud Build.
+#
+# `gcloud builds submit` reads THIS file (not .dockerignore) when deciding
+# what to package. Without it the whole venv (~650 MB) is uploaded on every
+# deploy and .env is staged into the Cloud Build GCS bucket.
+
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# secrets — must never leave the machine
+.env
+.env.*
+!.env.example
+
+# local runtime junk
+nohup.out
+*.log
+.DS_Store
