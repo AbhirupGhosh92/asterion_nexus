@@ -1,0 +1,9 @@
+# Require owner review on security-sensitive paths when code owner reviews are enabled.
+* @AbhirupGhosh92
+
+/.github/ @AbhirupGhosh92
+/scripts/ @AbhirupGhosh92
+/backend/auth.py @AbhirupGhosh92
+/backend/quota.py @AbhirupGhosh92
+/backend/admin.py @AbhirupGhosh92
+/infra/ @AbhirupGhosh92
