@@ -175,7 +175,9 @@ class DifyClient:
                     for key in (tools or [])
                     if (spec := catalog.get(key))
                 ],
-                "max_iteration": 5,
+                # Room for multi-step missions: retries after a tool error and
+                # strategy changes after a bad result both cost iterations.
+                "max_iteration": 12,
             },
             "user_input_form": [],
         })
@@ -290,13 +292,19 @@ class DifyClient:
 
     # ---- running (service API) --------------------------------------------
 
-    async def chat(self, api_key: str, query: str, *, user_id: str,
-                   conversation_id: str | None = None) -> dict:
-        """Run the agent (agent apps are streaming-only); returns the full answer."""
+    async def run_agent(self, api_key: str, query: str, *, user_id: str,
+                        conversation_id: str | None = None):
+        """
+        Run an agent, streaming its work as it happens.
+
+        Yields ("step", {...}) each time the agent finishes a tool call — its
+        reasoning, which tool it picked, the arguments it chose and what came
+        back — and ("token", str) for the answer text. Agent apps are
+        streaming-only, so this is the only way to run them.
+        """
         import json as _json
 
-        answer: list[str] = []
-        conv = conversation_id
+        steps: dict[int, dict] = {}
         async with httpx.AsyncClient(timeout=300) as c:
             async with c.stream(
                 "POST", f"{self.base}/v1/chat-messages",
@@ -312,6 +320,7 @@ class DifyClient:
                 if r.status_code != 200:
                     body = (await r.aread()).decode(errors="replace")
                     raise DifyError(f"Dify chat failed: {r.status_code} {body[:300]}")
+
                 async for line in r.aiter_lines():
                     if not line.startswith("data: "):
                         continue
@@ -319,12 +328,37 @@ class DifyClient:
                         evt = _json.loads(line[6:])
                     except ValueError:
                         continue
-                    if evt.get("event") in ("message", "agent_message"):
-                        answer.append(evt.get("answer", ""))
-                        conv = evt.get("conversation_id", conv)
-                    elif evt.get("event") == "error":
+
+                    kind = evt.get("event")
+                    if kind == "agent_thought":
+                        # Dify updates the same position as the step unfolds
+                        # (thought → tool+input → observation), so merge.
+                        pos = int(evt.get("position") or 0)
+                        step = steps.setdefault(pos, {"position": pos})
+                        for field in ("thought", "tool", "tool_input", "observation"):
+                            value = evt.get(field)
+                            if value:
+                                step[field] = value
+                        # Emit once the round-trip is complete.
+                        if step.get("tool") and step.get("observation") and not step.get("_sent"):
+                            step["_sent"] = True
+                            yield ("step", {k: v for k, v in step.items()
+                                            if not k.startswith("_")})
+                    elif kind in ("message", "agent_message"):
+                        yield ("token", evt.get("answer", ""))
+                    elif kind == "error":
                         raise DifyError(f"Dify run error: {evt.get('message', '')[:300]}")
-        return {"answer": "".join(answer), "conversation_id": conv}
+
+    async def chat(self, api_key: str, query: str, *, user_id: str,
+                   conversation_id: str | None = None) -> dict:
+        """Blocking convenience wrapper over run_agent."""
+        answer, steps = [], []
+        async for kind, payload in self.run_agent(
+            api_key, query, user_id=user_id, conversation_id=conversation_id
+        ):
+            (steps if kind == "step" else answer).append(payload)
+        return {"answer": "".join(answer), "steps": steps,
+                "conversation_id": conversation_id}
 
 
 REFUSAL_TEXT = "I can't help with that"
@@ -360,29 +394,61 @@ class DifyRails:
         transcript = "\n".join(f"{m['role']}: {_text(m['content'])[:400]}" for m in prior)
         return f"(Conversation so far:\n{transcript})\n\nuser: {last}"
 
-    async def generate_async(self, messages: list[dict], *, user_id: str = "anonymous") -> dict:
-        text_msgs = [{"role": m["role"], "content": _text(m["content"])} for m in messages]
-
+    async def _screen_input(self, text_msgs: list[dict]) -> str | None:
+        """Returns the refusal text if the input rails blocked this turn."""
         checked = await self._screen.generate_async(
             messages=text_msgs, options={"rails": ["input"]}
         )
         inp = checked.response[0]["content"]
-        if REFUSAL_TEXT in inp:
-            return {"role": "assistant", "content": inp}
+        return inp if REFUSAL_TEXT in inp else None
 
-        result = await self._client.chat(
-            self._api_key, self._build_query(messages), user_id=user_id
-        )
-        content = result["answer"]
-
+    async def _screen_output(self, text_msgs: list[dict], content: str) -> str:
         out = await self._screen.generate_async(
             messages=text_msgs + [{"role": "assistant", "content": content}],
             options={"rails": ["output"]},
         )
-        return {"role": "assistant", "content": out.response[0]["content"]}
+        return out.response[0]["content"]
+
+    async def generate_async(self, messages: list[dict], *, user_id: str = "anonymous") -> dict:
+        text_msgs = [{"role": m["role"], "content": _text(m["content"])} for m in messages]
+
+        refusal = await self._screen_input(text_msgs)
+        if refusal:
+            return {"role": "assistant", "content": refusal, "steps": []}
+
+        result = await self._client.chat(
+            self._api_key, self._build_query(messages), user_id=user_id
+        )
+        return {
+            "role": "assistant",
+            "content": await self._screen_output(text_msgs, result["answer"]),
+            "steps": result["steps"],
+        }
 
     async def stream_async(self, messages: list[dict], *, user_id: str = "anonymous"):
-        result = await self.generate_async(messages, user_id=user_id)
-        content = result["content"]
+        """
+        Yields {"kind": "step", ...} as the agent makes each decision, then
+        {"kind": "token", ...} for the guarded answer. Decisions surface live;
+        the answer is still screened by the output rails before any of it is
+        emitted.
+        """
+        text_msgs = [{"role": m["role"], "content": _text(m["content"])} for m in messages]
+
+        refusal = await self._screen_input(text_msgs)
+        if refusal:
+            yield {"kind": "token", "text": refusal}
+            return
+
+        answer, steps = [], []
+        async for kind, payload in self._client.run_agent(
+            self._api_key, self._build_query(messages), user_id=user_id
+        ):
+            if kind == "step":
+                steps.append(payload)
+                yield {"kind": "step", "step": payload}
+            else:
+                answer.append(payload)
+
+        content = await self._screen_output(text_msgs, "".join(answer))
         for i in range(0, len(content), 24):
-            yield content[i:i + 24]
+            yield {"kind": "token", "text": content[i:i + 24]}

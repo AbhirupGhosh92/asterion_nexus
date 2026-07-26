@@ -88,14 +88,24 @@ class ChatStore:
             .collection("messages")
             .order_by("seq")
         )
-        return [
-            {"role": d.get("role"), "content": d.get("content")}
-            async for d in query.stream()
-        ]
+        # NOTE: DocumentSnapshot.get() RAISES on a missing field — it is not
+        # dict.get(). Convert to a dict first so optional fields (steps) are
+        # safe to read on older messages that predate them.
+        out = []
+        async for doc in query.stream():
+            d = doc.to_dict() or {}
+            out.append({
+                "role": d.get("role"),
+                "content": d.get("content"),
+                "steps": d.get("steps") or [],
+            })
+        return out
 
     async def append_exchange(
-        self, uid: str, cid: str, user_content: str, assistant_content: str
+        self, uid: str, cid: str, user_content: str, assistant_content: str,
+        steps: list[dict] | None = None,
     ) -> None:
+        """`steps` is an agent's decision trace, stored so history replays it."""
         if not self._db:
             return
         conv_ref = self._user(uid).collection("conversations").document(cid)
@@ -104,7 +114,11 @@ class ChatStore:
         batch = self._db.batch()
         msgs = conv_ref.collection("messages")
         batch.set(msgs.document(), {"role": "user", "content": user_content, "seq": seq, "ts": _now()})
-        batch.set(msgs.document(), {"role": "assistant", "content": assistant_content, "seq": seq + 1, "ts": _now()})
+        assistant_doc = {"role": "assistant", "content": assistant_content,
+                         "seq": seq + 1, "ts": _now()}
+        if steps:
+            assistant_doc["steps"] = steps
+        batch.set(msgs.document(), assistant_doc)
         batch.update(conv_ref, {"updated_at": _now(), "message_count": seq + 2})
         await batch.commit()
 

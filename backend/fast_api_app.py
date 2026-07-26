@@ -129,10 +129,19 @@ class ChatRequest(BaseModel):
     attachments: list[str] = []       # upload ids attached to the last message
 
 
+class AgentStep(BaseModel):
+    position: int = 0
+    thought: str | None = None
+    tool: str | None = None
+    tool_input: str | None = None
+    observation: str | None = None
+
+
 class ChatResponse(BaseModel):
     content: str
     conversation_id: str | None
     guardrail_triggered: bool = False
+    steps: list[AgentStep] = []  # agent decision trace, when a model has one
 
 
 # --------------------------------------------------------------------------- #
@@ -267,6 +276,7 @@ async def chat(
     if body.attachments and state.media.enabled:
         await _attach_media(state, user.uid, messages, body.attachments)
 
+    steps: list[dict] = []
     multimodal = isinstance(messages[-1]["content"], list) and raw_llm is not None
     if multimodal:
         content, guardrail_triggered = await _guarded_multimodal(rails, raw_llm, messages)
@@ -275,6 +285,7 @@ async def chat(
         # carries the requesting user's id for scoping and attribution.
         result = await rails.generate_async(messages, user_id=user.uid)
         content = result["content"]
+        steps = result.get("steps", [])
         guardrail_triggered = REFUSAL_TEXT in content
     else:
         # All input/output flows through NeMo Guardrails. If an input rail
@@ -291,7 +302,7 @@ async def chat(
             cid = await state.store.create_conversation(
                 user.uid, await _make_title(state, user_text)
             )
-        await state.store.append_exchange(user.uid, cid, user_text, content)
+        await state.store.append_exchange(user.uid, cid, user_text, content, steps=steps)
 
     if body.use_memory and not guardrail_triggered:
         await state.memory.store(
@@ -301,7 +312,8 @@ async def chat(
         )
 
     return ChatResponse(
-        content=content, conversation_id=cid, guardrail_triggered=guardrail_triggered
+        content=content, conversation_id=cid,
+        guardrail_triggered=guardrail_triggered, steps=steps,
     )
 
 
@@ -334,6 +346,7 @@ async def chat_stream(
     async def event_source():
         cid = body.conversation_id
         new_conversation = cid is None
+        steps: list[dict] = []
         if state.store.enabled:
             await state.store.ensure_user(user.uid, user.email, user.tier)
             if new_conversation:
@@ -347,10 +360,18 @@ async def chat_stream(
             for i in range(0, len(content), 24):
                 yield f"data: {json.dumps({'type': 'token', 'text': content[i:i + 24]})}\n\n"
         elif getattr(rails, "needs_user", False):
+            # Agents stream their decisions as they make them; image gen and
+            # older paths just yield plain text.
             full = []
-            async for chunk in rails.stream_async(messages, user_id=user.uid):
-                full.append(chunk)
-                yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+            async for item in rails.stream_async(messages, user_id=user.uid):
+                if isinstance(item, dict) and item.get("kind") == "step":
+                    step = item["step"]
+                    steps.append(step)
+                    yield f"data: {json.dumps({'type': 'step', 'step': step})}\n\n"
+                    continue
+                text = item["text"] if isinstance(item, dict) else item
+                full.append(text)
+                yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
             content = "".join(full)
             guardrail_triggered = REFUSAL_TEXT in content
         else:
@@ -362,7 +383,7 @@ async def chat_stream(
             guardrail_triggered = REFUSAL_TEXT in content
 
         if state.store.enabled and cid:
-            await state.store.append_exchange(user.uid, cid, user_text, content)
+            await state.store.append_exchange(user.uid, cid, user_text, content, steps=steps)
             if new_conversation:
                 title = await _make_title(state, user_text)
                 await state.store.set_title(user.uid, cid, title)

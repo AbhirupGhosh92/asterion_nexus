@@ -235,6 +235,16 @@ plugin (Console API, marketplace identifier) + one `TOOL_CATALOG` entry.
 Tool plugins installed: duckduckgo, wikipedia, regex (+ built-ins time,
 webscraper, code).
 
+**Agent decision traces:** `DifyClient.run_agent` streams Dify's
+`agent_thought` events (merged per position: reasoning → tool + arguments →
+observation) and yields each finished decision as it happens. `DifyRails`
+forwards them as `{"type":"step"}` SSE events *live*, while the final answer
+still passes the output rails before any of it is emitted. The UI renders an
+expandable DECISION TRACE above the answer, and steps are persisted on the
+assistant message so replaying a conversation replays the reasoning.
+`max_iteration` is 12 — retries after a tool error and strategy changes
+after a bad result both consume iterations.
+
 **MCP servers (Phase 3):** admin → MCP LINKS registers any MCP server
 (streamable HTTP/SSE URL, optional auth headers) as a Dify tool provider via
 the Console API; its tools are discovered on link and join the ARSENAL

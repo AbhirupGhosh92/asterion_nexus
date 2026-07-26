@@ -333,6 +333,16 @@ export function watchAuth(cb: (user: User | null) => void): () => void {
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  steps?: AgentStep[];
+}
+
+/** One autonomous decision an agent made: why, which tool, and what it got. */
+export interface AgentStep {
+  position: number;
+  thought?: string;
+  tool?: string;
+  tool_input?: string;
+  observation?: string;
 }
 
 export async function chat(messages: ChatMessage[], conversationId?: string) {
@@ -354,6 +364,8 @@ export interface StreamCallbacks {
   onMeta?: (conversationId: string | null) => void;
   /** Fired when a new conversation gets its generated title. */
   onTitle?: (title: string) => void;
+  /** Fired each time an agent completes a tool decision. */
+  onStep?: (step: AgentStep) => void;
 }
 
 /** Streaming chat over SSE. Events are JSON: token / meta / title / done. */
@@ -392,6 +404,7 @@ export async function chatStream(
       if (!evt.startsWith("data: ")) continue;
       const payload = JSON.parse(evt.slice(6));
       if (payload.type === "token") cbs.onToken(payload.text);
+      else if (payload.type === "step") cbs.onStep?.(payload.step);
       else if (payload.type === "meta") cbs.onMeta?.(payload.conversation_id);
       else if (payload.type === "title") cbs.onTitle?.(payload.title);
       else if (payload.type === "done") return;

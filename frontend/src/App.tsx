@@ -13,6 +13,7 @@ import {
   signOutUser,
   uploadFile,
   watchAuth,
+  type AgentStep,
   type ChatMessage,
   type ConversationMeta,
   type Profile,
@@ -66,6 +67,54 @@ interface UiMessage extends ChatMessage {
   streaming?: boolean;
   guardrail?: boolean;
   attachments?: Attachment[];
+}
+
+/** The agent's autonomous decisions, rendered as an expandable trace. */
+function DecisionTrace({ steps, live }: { steps: AgentStep[]; live?: boolean }) {
+  const [open, setOpen] = useState(true);
+  if (steps.length === 0) return null;
+  return (
+    <div className="trace">
+      <button className="trace-head" onClick={() => setOpen((v) => !v)}>
+        <span className="trace-caret">{open ? "▾" : "▸"}</span>
+        ◈ DECISION TRACE
+        <span className="trace-count">
+          {steps.length} step{steps.length === 1 ? "" : "s"}
+        </span>
+        {live && <span className="trace-live">● THINKING</span>}
+      </button>
+      {open &&
+        steps.map((s, i) => (
+          <div className="trace-step" key={s.position ?? i}>
+            <div className="trace-step-head">
+              <span className="trace-num">{String(i + 1).padStart(2, "0")}</span>
+              {(s.tool ?? "reasoning").split(";").filter(Boolean).map((t) => (
+                <span className="trace-tool" key={t}>
+                  ⚙ {t}
+                </span>
+              ))}
+            </div>
+            {s.thought && <div className="trace-thought">“{s.thought.trim()}”</div>}
+            {s.tool_input && (
+              <div className="trace-line">
+                <span className="trace-label">ARGS</span>
+                <code>{s.tool_input.slice(0, 300)}</code>
+              </div>
+            )}
+            {s.observation && (
+              <div className="trace-line">
+                <span className="trace-label">RESULT</span>
+                <code className="trace-obs">
+                  {s.observation.length > 400
+                    ? s.observation.slice(0, 400) + " …"
+                    : s.observation}
+                </code>
+              </div>
+            )}
+          </div>
+        ))}
+    </div>
+  );
 }
 
 let nextId = 1;
@@ -183,6 +232,7 @@ function Workspace({ user }: { user: User | null }) {
     try {
       const conv = await getConversation(id);
       setActiveId(id);
+      // steps ride along so a replayed agent turn still shows its decisions
       setMessages(conv.messages.map((m) => ({ ...m, id: nextId++ })));
     } catch {
       /* stale entry; refresh list */
@@ -238,6 +288,12 @@ function Workspace({ user }: { user: User | null }) {
           onToken: (token) =>
             setMessages((cur) =>
               cur.map((m) => (m.id === botMsg.id ? { ...m, content: m.content + token } : m)),
+            ),
+          onStep: (step) =>
+            setMessages((cur) =>
+              cur.map((m) =>
+                m.id === botMsg.id ? { ...m, steps: [...(m.steps ?? []), step] } : m,
+              ),
             ),
           onMeta: (cid) => {
             if (cid) setActiveId(cid);
@@ -388,6 +444,9 @@ function Workspace({ user }: { user: User | null }) {
                         ),
                       )}
                     </div>
+                  )}
+                  {m.role === "assistant" && m.steps && m.steps.length > 0 && (
+                    <DecisionTrace steps={m.steps} live={m.streaming} />
                   )}
                   <MessageContent content={m.content} />
                   {m.streaming && <span className="cursor">▊</span>}

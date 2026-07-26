@@ -603,6 +603,106 @@ html, body, #root { height: 100%; }
 
 .agent-form .composer-send { padding: 10px 0; }
 
+/* --- Agent decision trace --- */
+.trace {
+  border: 1px solid color-mix(in srgb, var(--neon-lime) 22%, transparent);
+  border-radius: 6px;
+  background: rgba(182, 255, 46, 0.03);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.trace-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--neon-lime);
+}
+
+.trace-caret { font-size: 0.7rem; }
+
+.trace-count {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+  color: var(--text-dim);
+  font-size: 0.62rem;
+}
+
+.trace-live {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--neon-cyan);
+  animation: blink 1.2s steps(1) infinite;
+}
+
+.trace-step {
+  padding: 8px 10px 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--neon-lime) 15%, transparent);
+}
+
+.trace-step-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.trace-num {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  border: 1px solid var(--border-dim);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.trace-tool {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--neon-lime);
+}
+
+.trace-thought {
+  margin-top: 5px;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.trace-line {
+  margin-top: 5px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.68rem;
+}
+
+.trace-label {
+  font-family: var(--font-display);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  padding-top: 2px;
+  width: 42px;
+}
+
+.trace-line code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  opacity: 0.85;
+  word-break: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
+}
+
+.trace-obs { opacity: 0.7 !important; }
+
 /* --- Quotas --- */
 .hud-quota {
   color: var(--neon-lime);
