@@ -64,7 +64,7 @@ Docs: [docs/DESIGN.md](docs/DESIGN.md) (architecture & rationale) ·
 ## Deploy to the cloud (one command)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/nexus-ai-platform && cd nexus-ai-platform
+git clone https://github.com/AbhirupGhosh92/asterion_nexus && cd asterion_nexus
 
 # 1. Authenticate
 gcloud auth login
