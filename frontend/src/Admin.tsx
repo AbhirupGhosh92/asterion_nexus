@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { adminApi, type AdminModel, type AdminUser, type McpServer } from "./lib/apiClient";
+import {
+  adminApi,
+  type AdminModel,
+  type AdminUser,
+  type McpServer,
+  type QuotaConfig,
+} from "./lib/apiClient";
 
 const TIERS = ["free", "pro", "admin"];
 const PROVIDERS = ["vertexai", "vertexai_image", "ollama", "mock"];
@@ -15,7 +21,7 @@ const EMPTY_MODEL: AdminModel = {
 };
 
 export default function AdminPanel({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<"users" | "models" | "agents" | "mcp">("users");
+  const [tab, setTab] = useState<"users" | "quotas" | "models" | "agents" | "mcp">("users");
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -27,6 +33,12 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
             onClick={() => setTab("users")}
           >
             OPERATIVES
+          </button>
+          <button
+            className={`admin-tab ${tab === "quotas" ? "admin-tab-on" : ""}`}
+            onClick={() => setTab("quotas")}
+          >
+            QUOTAS
           </button>
           <button
             className={`admin-tab ${tab === "models" ? "admin-tab-on" : ""}`}
@@ -53,6 +65,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
       </div>
       {error && <p className="gate-error">⚠ {error}</p>}
       {tab === "users" && <UsersTab onError={setError} />}
+      {tab === "quotas" && <QuotasTab onError={setError} />}
       {tab === "models" && <ModelsTab onError={setError} />}
       {tab === "agents" && <AgentsTab onError={setError} />}
       {tab === "mcp" && <McpTab onError={setError} />}
@@ -342,6 +355,75 @@ function AgentsTab({ onError }: { onError: (e: string | null) => void }) {
   );
 }
 
+function QuotasTab({ onError }: { onError: (e: string | null) => void }) {
+  const [cfg, setCfg] = useState<QuotaConfig | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    adminApi.getQuotaConfig().then(setCfg).catch((e) => onError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function save(next: Partial<QuotaConfig>) {
+    onError(null);
+    setBusy(true);
+    try {
+      setCfg(await adminApi.setQuotaConfig(next));
+    } catch (e) {
+      onError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!cfg) return <div className="admin-scroll"><p className="cell-dim">loading…</p></div>;
+
+  return (
+    <div className="admin-scroll">
+      <div className="agent-form">
+        <div className="quota-toggle">
+          <button
+            className={`pill pill-btn ${cfg.enabled ? "pill-on" : "pill-off"}`}
+            onClick={() => save({ enabled: !cfg.enabled })}
+            disabled={busy}
+          >
+            {cfg.enabled ? "ENFORCEMENT ON" : "ENFORCEMENT OFF"}
+          </button>
+          <span className="cell-dim">
+            monthly API calls per user · −1 = unlimited · admins always bypass
+          </span>
+        </div>
+        <div className="agent-form-row">
+          {TIERS.map((t) => (
+            <label key={t} className="quota-field">
+              <span className="quota-field-label">{t.toUpperCase()}</span>
+              <input
+                className="admin-input"
+                type="number"
+                value={cfg.limits[t] ?? 0}
+                onChange={(e) =>
+                  setCfg({ ...cfg, limits: { ...cfg.limits, [t]: Number(e.target.value) } })
+                }
+              />
+            </label>
+          ))}
+        </div>
+        <button
+          className={`composer-send ${busy ? "thinking-indicator" : ""}`}
+          onClick={() => save({ limits: cfg.limits })}
+          disabled={busy}
+        >
+          {busy ? "SAVING…" : "SAVE LIMITS"}
+        </button>
+      </div>
+      <p className="cell-dim">
+        Usage resets automatically at the start of each UTC month. Per-user
+        overrides and one-off resets live in the OPERATIVES tab.
+      </p>
+    </div>
+  );
+}
+
 function UsersTab({ onError }: { onError: (e: string | null) => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
 
@@ -350,6 +432,27 @@ function UsersTab({ onError }: { onError: (e: string | null) => void }) {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function applyOverride(uid: string, raw: string) {
+    onError(null);
+    const trimmed = raw.trim();
+    try {
+      await adminApi.setUserQuota(uid, trimmed === "" ? null : Number(trimmed));
+      refresh();
+    } catch (e) {
+      onError(String(e));
+    }
+  }
+
+  async function resetUsage(uid: string) {
+    onError(null);
+    try {
+      await adminApi.resetUserQuota(uid);
+      refresh();
+    } catch (e) {
+      onError(String(e));
+    }
+  }
 
   async function changeTier(uid: string, tier: string) {
     onError(null);
@@ -378,8 +481,9 @@ function UsersTab({ onError }: { onError: (e: string | null) => void }) {
           <tr>
             <th>IDENTITY</th>
             <th>TIER</th>
+            <th>USAGE</th>
+            <th>OVERRIDE</th>
             <th>STATUS</th>
-            <th>LAST SEEN</th>
             <th></th>
           </tr>
         </thead>
@@ -405,15 +509,45 @@ function UsersTab({ onError }: { onError: (e: string | null) => void }) {
                   ))}
                 </select>
               </td>
+              <td className="cell-dim">
+                {u.quota_limit === undefined ? (
+                  "—"
+                ) : (
+                  <span
+                    className={
+                      u.quota_limit >= 0 && (u.quota_used ?? 0) >= u.quota_limit
+                        ? "quota-exhausted"
+                        : ""
+                    }
+                  >
+                    {u.quota_used ?? 0} / {u.quota_limit < 0 ? "∞" : u.quota_limit}
+                  </span>
+                )}
+              </td>
+              <td>
+                <input
+                  className="admin-input quota-override-input"
+                  type="number"
+                  placeholder="tier"
+                  defaultValue={u.quota_override ?? ""}
+                  title="Per-user monthly limit. Blank = use tier default, −1 = unlimited."
+                  onBlur={(e) => {
+                    const next = e.target.value.trim();
+                    const cur = u.quota_override === null || u.quota_override === undefined
+                      ? "" : String(u.quota_override);
+                    if (next !== cur) applyOverride(u.uid, next);
+                  }}
+                />
+              </td>
               <td>
                 <span className={u.disabled ? "pill pill-off" : "pill pill-on"}>
                   {u.disabled ? "LOCKED" : "ACTIVE"}
                 </span>
               </td>
-              <td className="cell-dim">
-                {u.last_sign_in ? new Date(u.last_sign_in).toLocaleDateString() : "never"}
-              </td>
-              <td>
+              <td className="row-actions">
+                <button className="admin-btn" onClick={() => resetUsage(u.uid)} title="Reset this month's usage to 0">
+                  RESET
+                </button>
                 <button className="admin-btn" onClick={() => toggleDisabled(u)}>
                   {u.disabled ? "UNLOCK" : "LOCK"}
                 </button>

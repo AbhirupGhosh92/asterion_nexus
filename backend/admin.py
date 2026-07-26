@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 # Users
 # --------------------------------------------------------------------------- #
 @router.get("/users")
-async def list_users():
+async def list_users(request: Request):
     def _list():
         out = []
         for u in fb_auth.list_users().iterate_all():
@@ -40,7 +40,24 @@ async def list_users():
             })
         return out
 
-    return await asyncio.to_thread(_list)
+    users = await asyncio.to_thread(_list)
+
+    # Decorate with this period's quota usage / effective limit.
+    quota = request.app.state.quota
+    if quota.enabled:
+        cfg = await quota.get_config()
+        used_counts, overrides = await asyncio.gather(
+            asyncio.gather(*(quota.used(u["uid"]) for u in users)),
+            asyncio.gather(*(quota.override_for(u["uid"]) for u in users)),
+        )
+        for u, used, override in zip(users, used_counts, overrides):
+            u["quota_used"] = used
+            u["quota_override"] = override
+            u["quota_limit"] = (
+                override if override is not None
+                else cfg["limits"].get(u["tier"], 0)
+            )
+    return users
 
 
 class TierUpdate(BaseModel):
@@ -70,6 +87,49 @@ async def set_disabled(uid: str, body: DisabledUpdate, admin: AuthedUser = Depen
         await asyncio.to_thread(fb_auth.revoke_refresh_tokens, uid)
     log.info("admin %s set disabled=%s for uid=%s", admin.email, body.disabled, uid)
     return {"uid": uid, "disabled": body.disabled}
+
+
+# --------------------------------------------------------------------------- #
+# Quotas — monthly per-user API call limits
+# --------------------------------------------------------------------------- #
+class QuotaConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    limits: dict[str, int] | None = None  # {"free": 5, "pro": 100, "admin": -1}
+
+
+class QuotaOverrideUpdate(BaseModel):
+    limit: int | None = None  # None clears the override; -1 = unlimited
+
+
+@router.get("/quota")
+async def get_quota_config(request: Request):
+    return await request.app.state.quota.get_config(fresh=True)
+
+
+@router.post("/quota")
+async def set_quota_config(body: QuotaConfigUpdate, request: Request,
+                           admin: AuthedUser = Depends(require_admin)):
+    cfg = await request.app.state.quota.set_config(
+        enabled=body.enabled, limits=body.limits
+    )
+    log.info("admin %s updated quota config: %s", admin.email, cfg)
+    return cfg
+
+
+@router.post("/users/{uid}/quota")
+async def set_user_quota(uid: str, body: QuotaOverrideUpdate, request: Request,
+                         admin: AuthedUser = Depends(require_admin)):
+    await request.app.state.quota.set_override(uid, body.limit)
+    log.info("admin %s set quota override=%s for uid=%s", admin.email, body.limit, uid)
+    return {"uid": uid, "quota_override": body.limit}
+
+
+@router.post("/users/{uid}/quota/reset")
+async def reset_user_quota(uid: str, request: Request,
+                           admin: AuthedUser = Depends(require_admin)):
+    await request.app.state.quota.reset(uid)
+    log.info("admin %s reset quota usage for uid=%s", admin.email, uid)
+    return {"uid": uid, "used": 0}
 
 
 # --------------------------------------------------------------------------- #

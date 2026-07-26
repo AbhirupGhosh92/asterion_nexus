@@ -78,12 +78,22 @@ export interface ModelOption {
   provider: string;
 }
 
+export interface QuotaStatus {
+  used: number;
+  limit: number; // -1 = unlimited
+  remaining: number;
+  period: string; // YYYY-MM
+  resets_on: string; // YYYY-MM-DD
+  enforced: boolean;
+}
+
 export interface Profile {
   uid: string;
   email: string | null;
   tier: string;
   is_admin: boolean;
   models: ModelOption[];
+  quota: QuotaStatus;
 }
 
 export async function fetchProfile(): Promise<Profile | null> {
@@ -135,6 +145,14 @@ export interface AdminUser {
   tier: string;
   disabled: boolean;
   last_sign_in: number | null;
+  quota_used?: number;
+  quota_limit?: number;
+  quota_override?: number | null;
+}
+
+export interface QuotaConfig {
+  enabled: boolean;
+  limits: Record<string, number>;
 }
 
 export interface AdminModel {
@@ -164,6 +182,32 @@ export const adminApi = {
     const res = await authedFetch(`/api/admin/users/${uid}/disabled`, {
       method: "POST",
       body: JSON.stringify({ disabled }),
+    });
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+  },
+  getQuotaConfig: async (): Promise<QuotaConfig> => {
+    const res = await authedFetch("/api/admin/quota");
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+    return res.json();
+  },
+  setQuotaConfig: async (cfg: Partial<QuotaConfig>): Promise<QuotaConfig> => {
+    const res = await authedFetch("/api/admin/quota", {
+      method: "POST",
+      body: JSON.stringify(cfg),
+    });
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+    return res.json();
+  },
+  setUserQuota: async (uid: string, limit: number | null): Promise<void> => {
+    const res = await authedFetch(`/api/admin/users/${uid}/quota`, {
+      method: "POST",
+      body: JSON.stringify({ limit }),
+    });
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+  },
+  resetUserQuota: async (uid: string): Promise<void> => {
+    const res = await authedFetch(`/api/admin/users/${uid}/quota/reset`, {
+      method: "POST",
     });
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
   },
@@ -328,7 +372,11 @@ export async function chatStream(
       attachments: options?.attachments ?? [],
     }),
   });
-  if (!res.ok || !res.body) throw new Error(`Stream failed: ${res.status}`);
+  if (!res.ok || !res.body) {
+    // Surface the server's explanation (e.g. the quota message) verbatim.
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Stream failed: ${res.status} ${detail}`);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

@@ -74,14 +74,14 @@ class ModelRegistry:
 
     async def list_for_tier(self, tier: str) -> list[dict]:
         rank = TIER_RANK.get(tier, 0)
-        dify_up = self.dify is not None and self.dify.enabled
+        # Hide Dify agents whenever the engine isn't actually reachable (not
+        # deployed, or stopped locally) instead of failing at chat time.
+        dify_up = self.dify is not None and await self.dify.is_up()
         return [
             {"id": m["id"], "label": m["label"], "provider": m["provider"]}
             for m in await self.list_all()
             if m.get("enabled")
             and rank >= TIER_RANK.get(m.get("min_tier", "free"), 0)
-            # Hide Dify agents in environments without a Dify engine (e.g.
-            # prod before Dify is deployed) instead of failing at chat time.
             and (m.get("provider") != "dify" or dify_up)
         ]
 
@@ -111,7 +111,13 @@ class ModelRegistry:
         if not allowed:
             raise HTTPException(503, "No models available")
         if model_id is None:
-            model_id = allowed[0]["id"]
+            # Default to the seeded plain-LLM entry; never silently pick an
+            # agent or an image model just because it sorts first.
+            plain = [m for m in allowed if m["provider"] in ("vertexai", "ollama", "mock")]
+            model_id = next(
+                (m["id"] for m in plain if m["id"] == "default"),
+                (plain or allowed)[0]["id"],
+            )
         if model_id not in {m["id"] for m in allowed}:
             raise HTTPException(403, f"Model '{model_id}' not available on your tier")
 

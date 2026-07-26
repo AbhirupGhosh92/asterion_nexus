@@ -14,6 +14,7 @@ Run locally:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,6 +27,7 @@ from pydantic import BaseModel, Field
 from auth import AuthedUser, require_tier, verify_firebase_token
 from memory import MemoryBank
 from models_registry import ModelRegistry
+from quota import QuotaStore, refund_on_server_error, require_quota
 from store import ChatStore
 from uploads import MediaStore
 
@@ -80,6 +82,9 @@ async def lifespan(app: FastAPI):
     app.state.media = MediaStore(project=GCP_PROJECT, bucket=STORAGE_BUCKET)
     app.state.registry.media = app.state.media
 
+    # Monthly per-user API quotas (admin-configurable).
+    app.state.quota = QuotaStore(project=GCP_PROJECT)
+
     # Vertex AI Memory Bank — no-ops gracefully when not on GCP (local dev).
     app.state.memory = MemoryBank(project=GCP_PROJECT, region=GCP_REGION)
     await app.state.memory.connect()
@@ -96,6 +101,8 @@ from uploads import router as uploads_router  # noqa: E402
 
 app.include_router(admin_router)
 app.include_router(uploads_router)
+
+app.middleware("http")(refund_on_server_error)
 
 app.add_middleware(
     CORSMiddleware,
@@ -247,7 +254,7 @@ async def _make_title(app_state, first_message: str) -> str:
 async def chat(
     body: ChatRequest,
     request: Request,
-    user: AuthedUser = Depends(verify_firebase_token),
+    user: AuthedUser = Depends(require_quota),
 ):
     """Guarded chat completion with per-user long-term memory + history."""
     state = request.app.state
@@ -302,7 +309,7 @@ async def chat(
 async def chat_stream(
     body: ChatRequest,
     request: Request,
-    user: AuthedUser = Depends(verify_firebase_token),
+    user: AuthedUser = Depends(require_quota),
 ):
     """
     SSE streaming with history persistence. Events are JSON:
@@ -443,12 +450,17 @@ async def run_workflow(
 
 @app.get("/api/me")
 async def me(request: Request, user: AuthedUser = Depends(verify_firebase_token)):
+    models, quota = await asyncio.gather(
+        request.app.state.registry.list_for_tier(user.tier),
+        request.app.state.quota.status(user),
+    )
     return {
         "uid": user.uid,
         "email": user.email,
         "tier": user.tier,
         "is_admin": user.is_admin,
-        "models": await request.app.state.registry.list_for_tier(user.tier),
+        "models": models,
+        "quota": quota,
     }
 
 

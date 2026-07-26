@@ -27,6 +27,9 @@ Built pair-programming with [Claude Code](https://claude.com/claude-code).
 - 🛡 **RBAC + admin plane** — free/pro/admin tiers via Firebase custom
   claims; admins (an email allowlist) manage users, models, agents, and MCP
   servers from the UI.
+- ⚡ **Monthly API quotas** — cap calls per user (default: 5/month on free),
+  set per tier or per user from the admin panel, auto-resetting each month.
+  Users see their remaining calls live; failed calls are refunded.
 - 🌐 **Serverless deploy** — Cloud Run (scale-to-zero) + Firebase Hosting +
   Firestore + Cloud Storage, provisioned by Terraform, deployed by one script.
 
@@ -121,6 +124,7 @@ placeholder model.
 
 | I want to… | Do this |
 |---|---|
+| Change usage limits | Admin panel → QUOTAS (tiers) or OPERATIVES (per user) |
 | Add a chat model | Admin panel → MODEL GRID (no code) |
 | Add an LLM provider | One branch in `backend/providers.py` |
 | Create an agent | Admin panel → AGENT FORGE (no code) |

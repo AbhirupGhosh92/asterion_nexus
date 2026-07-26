@@ -154,14 +154,18 @@ function Workspace({ user }: { user: User | null }) {
     listConversations().then(setConversations).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const refreshProfile = useCallback(() => {
     fetchProfile().then(setProfile).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshProfile();
     fetch("/api/healthz")
       .then((r) => r.json())
       .then(setHealth)
       .catch(() => {});
     refreshConversations();
-  }, [refreshConversations]);
+  }, [refreshConversations, refreshProfile]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -245,14 +249,25 @@ function Workspace({ user }: { user: User | null }) {
       );
       refreshConversations();
     } catch (err) {
+      const raw = String(err);
+      // A 429 is the monthly quota, not a failure — say so in plain language.
+      const quotaHit = raw.includes("429");
+      const detail = raw.match(/"detail":"([^"]+)"/)?.[1];
       setMessages((cur) =>
         cur.map((m) =>
           m.id === botMsg.id
-            ? { ...m, content: `⚠ TRANSMISSION ERROR — ${String(err)}`, guardrail: true }
+            ? {
+                ...m,
+                content: quotaHit
+                  ? `⚠ QUOTA EXHAUSTED — ${detail ?? "You've used all your API calls for this month."}`
+                  : `⚠ TRANSMISSION ERROR — ${raw}`,
+                guardrail: true,
+              }
             : m,
         ),
       );
     } finally {
+      refreshProfile();
       setMessages((cur) => cur.map((m) => (m.id === botMsg.id ? { ...m, streaming: false } : m)));
       setBusy(false);
     }
@@ -317,6 +332,16 @@ function Workspace({ user }: { user: User | null }) {
               <span className={`dot ${health ? "dot-on" : "dot-off"}`} />
               {health ? `LINK:${health.provider.toUpperCase()}` : "LINK:OFFLINE"}
             </span>
+            {profile?.quota?.enforced && profile.quota.limit >= 0 && (
+              <span
+                className={`hud-chip hud-quota ${
+                  profile.quota.remaining === 0 ? "hud-quota-out" : ""
+                }`}
+                title={`${profile.quota.used} of ${profile.quota.limit} calls used this month · resets ${profile.quota.resets_on}`}
+              >
+                ⚡ {profile.quota.remaining}/{profile.quota.limit}
+              </span>
+            )}
             <span className="hud-chip hud-tier">{identity}</span>
             {profile?.is_admin && (
               <button

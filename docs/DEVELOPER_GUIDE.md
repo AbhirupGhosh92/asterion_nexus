@@ -66,7 +66,8 @@ No Google Cloud yet? `./start.sh --no-auth` + `LLM_PROVIDER=mock` in
 | `uploads.py` | File uploads (image/audio/video) to Firebase Storage under `uploads/{uid}/`, 25 MB cap. Serves file bytes back through an authenticated route. | changing upload rules/types |
 | `imagegen.py` | The "🎨 Image Studio" model: prompt → guardrail check → `gemini-2.5-flash-image` → saves PNG → returns `[image:<id>]` token. | changing image generation |
 | `dify.py` | Everything Dify: console client (create/delete agent apps, register MCP servers), the tool catalog, and `DifyRails` — the adapter that makes a Dify agent look like a normal model. | agents, tools, MCP |
-| `admin.py` | All `/api/admin/*` routes: user management, model registry CRUD, agent forge, MCP links. Every route requires an allowlisted admin email. | adding admin features |
+| `quota.py` | Monthly per-user API call limits: tier defaults + per-user overrides in Firestore, usage counted in `users/{uid}/usage/{YYYY-MM}` (auto-resets monthly), enforced by the `require_quota` dependency and refunded on errors. | changing rate limits / billing rules |
+| `admin.py` | All `/api/admin/*` routes: user management, quotas, model registry CRUD, agent forge, MCP links. Every route requires an allowlisted admin email. | adding admin features |
 | `guardrails/` | NeMo Guardrails config: `config.yml` (safety policies as prompts) + `rails.co` (the refusal message). No Python — it's configuration. | tuning safety rules |
 
 ### How one chat message flows
@@ -163,6 +164,7 @@ builds only).
 | 401 on everything | Frontend not logged in, or backend missing `GCP_PROJECT` (token verification needs the project id) |
 | 403 on a model | User's tier below the model's `min_tier` |
 | Guardrails refuse everything | `guardrails/config.yml` prompts too strict; check backend log — each rail decision is logged |
+| 429 on chat | Monthly quota exhausted — admin → QUOTAS to raise tier limits, or OPERATIVES to override/reset that user |
 | Dify calls fail | Is the stack up? (`docker compose ps` in `infra/dify/docker`) Login quirk: password must be base64'd (handled in `dify.py`) |
 | Image gen 404s the model | Vertex model names drift; probe with `google-genai` SDK (classic Imagen is gone since June 2026) |
 | Works locally, 404 in prod | Route not under `/api/` — the Hosting rewrite only forwards `/api/**` |

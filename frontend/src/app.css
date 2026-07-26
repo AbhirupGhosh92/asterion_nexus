@@ -431,9 +431,17 @@ html, body, #root { height: 100%; }
   gap: 12px;
 }
 
-.admin-head { display: flex; justify-content: space-between; align-items: center; }
+.admin-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-.admin-tabs { display: flex; gap: 8px; }
+.admin-head > .hud-signout { flex-shrink: 0; }
+
+.admin-tabs { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
 
 .admin-tab {
   font-family: var(--font-display);
@@ -458,6 +466,7 @@ html, body, #root { height: 100%; }
 
 .admin-table {
   width: 100%;
+  min-width: 640px; /* keeps columns readable; .admin-scroll scrolls on phones */
   border-collapse: collapse;
   font-size: 0.8rem;
 }
@@ -593,6 +602,35 @@ html, body, #root { height: 100%; }
 }
 
 .agent-form .composer-send { padding: 10px 0; }
+
+/* --- Quotas --- */
+.hud-quota {
+  color: var(--neon-lime);
+  border-color: color-mix(in srgb, var(--neon-lime) 35%, transparent);
+}
+
+.hud-quota-out {
+  color: var(--neon-magenta);
+  border-color: var(--neon-magenta);
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-magenta) 40%, transparent);
+}
+
+.quota-exhausted { color: var(--neon-magenta); font-weight: 600; }
+
+.quota-override-input { width: 72px; padding: 6px 8px; }
+
+.quota-toggle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.quota-field { display: flex; flex-direction: column; gap: 4px; }
+
+.quota-field-label {
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+}
+
+.row-actions { display: flex; gap: 6px; }
 
 .hud-admin {
   background: none;

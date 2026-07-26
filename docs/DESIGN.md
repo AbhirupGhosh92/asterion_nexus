@@ -261,6 +261,27 @@ reload re-renders images, and only the owner can fetch them). Gemini's own
 image safety filters remain active; a filtered generation returns a polite
 failure message.
 
+### 5.1g Monthly API quotas
+
+`backend/quota.py` caps how many model-calling requests each user may make
+per calendar month — the cost-control counterpart to RBAC.
+
+- **Limits** are per tier (default `free: 5`, `pro: 100`, `admin: -1` =
+  unlimited) in Firestore `config/quota`, with optional per-user overrides
+  (`users/{uid}.quota_override`). All editable from admin → QUOTAS and the
+  OPERATIVES table; enforcement can be switched off globally.
+- **Counters** live in `users/{uid}/usage/{YYYY-MM}` — keyed by UTC month, so
+  quotas reset themselves with no cron job.
+- **Enforcement** is a FastAPI dependency (`require_quota`) on the endpoints
+  that actually cost money (`/api/chat`, `/api/chat/stream`). Consume happens
+  up front so nothing slips through under concurrency; a middleware then
+  **refunds** the call if the request ended in an error (5xx, or a 4xx like
+  "model not on your tier"), so users are only charged for calls that ran a
+  model. 429s never consumed anything.
+- Operators in `ADMIN_EMAILS` bypass quotas entirely.
+- The UI shows remaining calls as a HUD chip (lime → magenta at zero) and
+  renders the server's quota message in the chat when a call is refused.
+
 ### 5.2 RBAC — user tiers
 
 Tiers live in Firebase **custom claims** (`{"tier": "free"|"pro"|"admin"}`),

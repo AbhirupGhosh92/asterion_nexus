@@ -66,10 +66,31 @@ class DifyClient:
         # csrf_token must also be echoed as the X-CSRF-Token header.
         self._http = httpx.AsyncClient(timeout=60)
         self._authed = False
+        self._up = False
+        self._up_at = 0.0
 
     @property
     def enabled(self) -> bool:
+        """Configured — not necessarily reachable (see is_up)."""
         return bool(self.base and self._email and self._password)
+
+    async def is_up(self, ttl: float = 60.0) -> bool:
+        """Cheap cached reachability probe, so a stopped engine hides its
+        agents from the model list instead of 500-ing at chat time."""
+        import time as _time
+
+        if not self.enabled:
+            return False
+        now = _time.monotonic()
+        if self._up_at and (now - self._up_at) < ttl:
+            return self._up
+        try:
+            r = await self._http.get(f"{self.base}/console/api/setup", timeout=3)
+            self._up = r.status_code == 200
+        except Exception:
+            self._up = False
+        self._up_at = now
+        return self._up
 
     # ---- console auth ------------------------------------------------------
 

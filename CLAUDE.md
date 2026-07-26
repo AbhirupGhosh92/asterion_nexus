@@ -35,6 +35,8 @@ cd backend && .venv/bin/python -c "import fast_api_app"
    identity allowlist — tiers do NOT grant admin.
 4. Clients never talk to Firestore/Storage/Dify directly — everything goes
    through FastAPI with uid scoping.
+5. Model-calling routes use `Depends(require_quota)` (auth + monthly quota),
+   not bare `verify_firebase_token` — otherwise the call is uncapped.
 
 ## Gotchas learned the hard way
 
@@ -52,6 +54,11 @@ cd backend && .venv/bin/python -c "import fast_api_app"
 - Firestore free tier applies ONLY to the `(default)` database.
 - Dify agents are per-engine: agents forged against local Dify don't exist in
   a cloud Dify (and vice versa) — re-forge from the admin panel after switching.
+- Quotas: admins (ADMIN_EMAILS) always bypass, so testing enforcement means
+  running the backend WITHOUT the test email in the allowlist.
+- `registry.get_rails(None, …)` defaults to the `default` model id and never
+  auto-picks an agent/image model; `dify.is_up()` (60 s cached probe) hides
+  agents when the engine is unreachable.
 
 ## E2E testing recipe (no user password ever)
 
