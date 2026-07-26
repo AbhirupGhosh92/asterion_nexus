@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import AdminPanel from "./Admin";
+import Markdown from "./Markdown";
 import {
   chatStream,
   deleteConversation,
@@ -34,8 +35,12 @@ function GeneratedImage({ fileId }: { fileId: string }) {
 
 const IMAGE_TOKEN = /\[image:([a-f0-9]{32})\]/g;
 
-/** Splits message text into text segments and generated-image tokens. */
-function MessageContent({ content }: { content: string }) {
+/**
+ * Splits message text into generated-image tokens and text segments.
+ * `markdown` is on for assistant output (tables, links, code) and off for
+ * user messages, which are shown exactly as typed.
+ */
+function MessageContent({ content, markdown }: { content: string; markdown?: boolean }) {
   const parts: (string | { id: string })[] = [];
   let last = 0;
   for (const m of content.matchAll(IMAGE_TOKEN)) {
@@ -47,10 +52,12 @@ function MessageContent({ content }: { content: string }) {
   return (
     <>
       {parts.map((p, i) =>
-        typeof p === "string" ? (
-          <span key={i}>{p}</span>
-        ) : (
+        typeof p !== "string" ? (
           <GeneratedImage key={i} fileId={p.id} />
+        ) : markdown ? (
+          <Markdown key={i}>{p}</Markdown>
+        ) : (
+          <span key={i}>{p}</span>
         ),
       )}
     </>
@@ -448,7 +455,10 @@ function Workspace({ user }: { user: User | null }) {
                   {m.role === "assistant" && m.steps && m.steps.length > 0 && (
                     <DecisionTrace steps={m.steps} live={m.streaming} />
                   )}
-                  <MessageContent content={m.content} />
+                  <MessageContent
+                    content={m.content}
+                    markdown={m.role === "assistant" && !m.guardrail}
+                  />
                   {m.streaming && <span className="cursor">▊</span>}
                 </div>
               </div>

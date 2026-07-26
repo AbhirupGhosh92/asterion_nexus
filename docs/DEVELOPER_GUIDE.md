@@ -95,6 +95,7 @@ because NeMo's full pipeline only handles plain text.
 |---|---|
 | `App.tsx` | Nearly the whole UI: auth gate, sidebar (conversation topics), chat panel, streaming rendering, model selector, attachments, `[image:id]` token rendering. |
 | `Admin.tsx` | The admin panel: OPERATIVES (users), MODEL GRID, AGENT FORGE, MCP LINKS tabs. |
+| `Markdown.tsx` | Renders assistant output as Markdown (tables, links, code, lists) via react-markdown + remark-gfm. Raw HTML is deliberately NOT enabled, so model output can't inject markup; links are forced to `target=_blank` + `rel=noopener`. User messages stay plain text. |
 | `lib/apiClient.ts` | Every backend call lives here. Attaches the Firebase token, parses SSE streams, caches image blob URLs. **Never `fetch` directly from components — add a function here.** |
 | `theme.css` | Design tokens: colors, fonts, glows. Change the whole look here. |
 | `app.css` | Component styles + the responsive breakpoint (`@media (max-width: 820px)` turns the sidebar into a drawer). |
