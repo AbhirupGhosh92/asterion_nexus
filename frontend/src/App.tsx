@@ -225,14 +225,39 @@ function Workspace({ user }: { user: User | null }) {
     refreshConversations();
   }, [refreshConversations, refreshProfile]);
 
+  // Stay pinned to the newest content — but only while the user is already at
+  // the bottom, so scrolling up to read isn't yanked back mid-stream.
+  const atBottomRef = useRef(true);
+  const [pinned, setPinned] = useState(true);
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    atBottomRef.current = bottom;
+    setPinned(bottom);
+  }
+
+  function scrollToBottom(smooth = false) {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    atBottomRef.current = true;
+    setPinned(true);
+  }
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // Instant (not smooth) because streaming fires this per token and smooth
+    // animations queue up and lag behind the text.
+    if (atBottomRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
   function newChat() {
     setActiveId(null);
     setMessages([]);
     setSidebarOpen(false);
+    atBottomRef.current = true;
+    setPinned(true);
   }
 
   async function openConversation(id: string) {
@@ -243,6 +268,7 @@ function Workspace({ user }: { user: User | null }) {
       setActiveId(id);
       // steps ride along so a replayed agent turn still shows its decisions
       setMessages(conv.messages.map((m) => ({ ...m, id: nextId++ })));
+      atBottomRef.current = true; // open a conversation at its latest message
     } catch {
       /* stale entry; refresh list */
       refreshConversations();
@@ -427,7 +453,7 @@ function Workspace({ user }: { user: User | null }) {
         {showAdmin ? (
           <AdminPanel onClose={() => setShowAdmin(false)} />
         ) : (
-          <main className="chat terminal-panel" ref={scrollRef}>
+          <main className="chat terminal-panel" ref={scrollRef} onScroll={handleScroll}>
             {messages.length === 0 && (
               <div className="empty">
                 <div className="empty-glyph">◢◤</div>
@@ -481,6 +507,12 @@ function Workspace({ user }: { user: User | null }) {
               );
             })}
           </main>
+        )}
+
+        {!showAdmin && !pinned && messages.length > 0 && (
+          <button className="jump-latest" onClick={() => scrollToBottom(true)}>
+            ↓ jump to latest
+          </button>
         )}
 
         {!showAdmin && (

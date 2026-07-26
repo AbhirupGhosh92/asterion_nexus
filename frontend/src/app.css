@@ -6,12 +6,16 @@ html, body, #root { height: 100%; }
 
 .layout {
   height: 100%;
+  height: 100dvh; /* survives mobile browser chrome showing/hiding */
   display: grid;
   grid-template-columns: auto 1fr;
+  overflow: hidden; /* the chat panel scrolls, never the page */
 }
 
 .shell {
+  position: relative; /* anchors the floating "jump to latest" pill */
   height: 100%;
+  min-height: 0; /* let children shrink instead of pushing the shell taller */
   min-width: 0;
   max-width: 960px;
   margin: 0 auto;
@@ -20,6 +24,7 @@ html, body, #root { height: 100%; }
   flex-direction: column;
   padding: 16px;
   gap: 14px;
+  overflow: hidden;
 }
 
 /* --- Sidebar (topics) --- */
@@ -112,6 +117,7 @@ html, body, #root { height: 100%; }
 
 /* --- HUD header --- */
 .hud {
+  flex-shrink: 0; /* header and composer stay put; only .chat scrolls */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -157,7 +163,11 @@ html, body, #root { height: 100%; }
 /* --- Chat area --- */
 .chat {
   flex: 1;
+  /* Without min-height:0 a flex child refuses to shrink below its content,
+     so the whole page scrolls and the header slides away. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -345,7 +355,7 @@ html, body, #root { height: 100%; }
 .chat::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 4px; }
 
 /* --- Composer zone: model select, attachments --- */
-.composer-zone { display: flex; flex-direction: column; gap: 8px; }
+.composer-zone { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 
 .model-select,
 .admin-select {
@@ -424,6 +434,7 @@ html, body, #root { height: 100%; }
 /* --- Admin panel --- */
 .admin {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -602,6 +613,26 @@ html, body, #root { height: 100%; }
 }
 
 .agent-form .composer-send { padding: 10px 0; }
+
+/* Shown only when the user has scrolled away from the newest message. */
+.jump-latest {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 92px;
+  z-index: 5;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--neon-cyan);
+  background: var(--bg-raised);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+}
+
+.jump-latest:hover { box-shadow: var(--glow-md) color-mix(in srgb, var(--neon-cyan) 50%, transparent); }
 
 /* --- Ask card: model questions as clickable options --- */
 .ask {
