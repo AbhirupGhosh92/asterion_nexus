@@ -15,6 +15,8 @@ they exist; never commit their contents.
 ./start.sh [--no-auth]    # local stack: Dify (docker), backend :8080, frontend :5173
 ./stop.sh [--all]         # stop backend+frontend; --all also stops Dify
 ./deploy.sh [backend|frontend|all]   # cloud deploy, driven by deploy.config
+./teardown-dify.sh [--yes] [--purge-agents]   # destroy ONLY the Dify VM (the
+                                              # sole always-on billed resource)
 
 # Backend alone (venv is Python 3.12 via uv — don't use system python if newer)
 cd backend && set -a && source .env && set +a && .venv/bin/uvicorn fast_api_app:app --port 8080

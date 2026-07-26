@@ -104,6 +104,18 @@ simply hidden — everything else works.
 > to your own IP (edit `google_compute_firewall.dify_http` in
 > `infra/main.tf`) or front it with a load balancer + TLS for serious use.
 
+To stop paying for it again, tear down **only** the Dify engine:
+
+```bash
+./teardown-dify.sh                 # destroys the VM, IP, firewall, service account
+./teardown-dify.sh --purge-agents  # also removes agent entries from the registry
+```
+
+Everything serverless (chat, history, users, models, uploads, image
+generation, the admin panel) keeps running untouched at $0 idle. Agent
+models simply disappear from the selector while no engine is reachable.
+Flip `WITH_DIFY="true"` and redeploy whenever you want them back.
+
 ## Local development
 
 ```bash

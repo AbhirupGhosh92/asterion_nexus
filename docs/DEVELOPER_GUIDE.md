@@ -154,8 +154,10 @@ builds only).
   site (which may host something else) is never touched by accident.
 - Secrets: never in the image (`.dockerignore` excludes `.env`); prod config
   arrives via Cloud Run env vars / Secret Manager (see `main.tf`).
-- Dify does not deploy (it isn't serverless). Prod hides agent models
-  automatically.
+- Dify is optional (it isn't serverless): `WITH_DIFY="true"` in
+  `deploy.config` provisions a small always-on VM; `./teardown-dify.sh`
+  destroys just that VM again, leaving every serverless piece running. With
+  no reachable engine, agent models are hidden automatically.
 
 ## 8. Debugging crib sheet
 
