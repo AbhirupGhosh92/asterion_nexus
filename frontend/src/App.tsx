@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import AdminPanel from "./Admin";
+import AskCard, { parseAsk } from "./AskCard";
 import Markdown from "./Markdown";
 import {
   chatStream,
@@ -205,6 +206,7 @@ function Workspace({ user }: { user: User | null }) {
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
 
   const refreshConversations = useCallback(() => {
     listConversations().then(setConversations).catch(() => {});
@@ -270,12 +272,12 @@ function Workspace({ user }: { user: User | null }) {
     }
   }
 
-  async function send() {
-    const text = input.trim();
+  async function send(override?: string) {
+    const text = (override ?? input).trim();
     if ((!text && pending.length === 0) || busy) return;
     const attachments = pending;
     setPending([]);
-    setInput("");
+    if (override === undefined) setInput("");
     setBusy(true);
 
     const userMsg: UiMessage = {
@@ -435,7 +437,15 @@ function Workspace({ user }: { user: User | null }) {
                 </p>
               </div>
             )}
-            {messages.map((m) => (
+            {messages.map((m, idx) => {
+              const isAssistant = m.role === "assistant" && !m.guardrail;
+              // While streaming, an ask block is still half-written — hide the
+              // raw JSON until it parses instead of flashing it at the user.
+              const partialAsk = m.streaming && m.content.includes("```ask");
+              const { text, ask } = isAssistant && !m.streaming
+                ? parseAsk(m.content)
+                : { text: partialAsk ? m.content.slice(0, m.content.indexOf("```ask")) : m.content, ask: null };
+              return (
               <div key={m.id} className={`msg msg-${m.role} ${m.guardrail ? "msg-guardrail" : ""}`}>
                 <div className="msg-label">{m.role === "user" ? "YOU" : "NEXUS"}</div>
                 <div className="msg-body">
@@ -455,14 +465,21 @@ function Workspace({ user }: { user: User | null }) {
                   {m.role === "assistant" && m.steps && m.steps.length > 0 && (
                     <DecisionTrace steps={m.steps} live={m.streaming} />
                   )}
-                  <MessageContent
-                    content={m.content}
-                    markdown={m.role === "assistant" && !m.guardrail}
-                  />
+                  <MessageContent content={text} markdown={isAssistant} />
+                  {partialAsk && <span className="ask-pending">◆ preparing options…</span>}
                   {m.streaming && <span className="cursor">▊</span>}
+                  {ask && (
+                    <AskCard
+                      ask={ask}
+                      live={idx === messages.length - 1 && !busy}
+                      onAnswer={(answer) => send(answer)}
+                      onOther={() => composerRef.current?.focus()}
+                    />
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </main>
         )}
 
@@ -520,6 +537,7 @@ function Workspace({ user }: { user: User | null }) {
                 {uploading ? "…" : "📎"}
               </button>
               <input
+                ref={composerRef}
                 className="composer-input"
                 placeholder="> enter transmission…"
                 value={input}
@@ -530,7 +548,7 @@ function Workspace({ user }: { user: User | null }) {
               />
               <button
                 className={`composer-send ${busy ? "thinking-indicator" : ""}`}
-                onClick={send}
+                onClick={() => send()}
                 disabled={busy || (!input.trim() && pending.length === 0)}
               >
                 {busy ? "…" : "TRANSMIT"}

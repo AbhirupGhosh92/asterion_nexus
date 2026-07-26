@@ -292,6 +292,20 @@ per calendar month — the cost-control counterpart to RBAC.
 - The UI shows remaining calls as a HUD chip (lime → magenta at zero) and
   renders the server's quota message in the chat when a call is refused.
 
+### 5.1h Interactive questions (ask protocol)
+
+When the model needs a decision it can't make itself, it emits a fenced
+```ask block of JSON (question, 2-4 options, optional multiSelect) instead of
+asking in prose; the UI renders clickable option buttons, and picking one
+sends it as the next turn. Older cards go inert so history reads correctly.
+
+The protocol lives in `guardrails/config.yml` under `instructions`, **not**
+as a system message: NeMo Guardrails builds its own prompt and silently
+drops arbitrary system messages, so a system-message version looks correct
+but never reaches the model. Raw-LLM paths (multimodal) pass `ASK_PROTOCOL`
+directly instead. Malformed or partial blocks fall back to plain text, so a
+half-streamed block never shows raw JSON.
+
 ### 5.2 RBAC — user tiers
 
 Tiers live in Firebase **custom claims** (`{"tier": "free"|"pro"|"admin"}`),

@@ -203,6 +203,26 @@ async def _attach_media(state, uid: str, messages: list[dict], upload_ids: list[
 
 REFUSAL_TEXT = "I can't help with that"
 
+# The "ask the user to choose" protocol lives in guardrails/config.yml under
+# `instructions`, because NeMo Guardrails builds its own prompt and DROPS
+# arbitrary system messages — putting it here would silently do nothing.
+# Raw-LLM paths (multimodal) get it via this system message instead.
+ASK_PROTOCOL = """\
+When you need the user to make a choice before you can continue, do not ask \
+in prose. Instead reply with ONLY a fenced block like this:
+
+```ask
+{"question": "Which database should I use?", "multiSelect": false, "options": [
+  {"label": "PostgreSQL", "description": "Relational, great for structured data"},
+  {"label": "MongoDB", "description": "Document store, flexible schema"}
+]}
+```
+
+Rules: 2-4 options, each label under 5 words, description one short line. \
+Set "multiSelect": true only when several answers can apply together. Use \
+this only for genuine either/or decisions you cannot make yourself — never \
+for questions you can answer, and never more than one block per reply."""
+
 
 def _text_of(content) -> str:
     if isinstance(content, list):
@@ -226,7 +246,9 @@ async def _guarded_multimodal(rails, llm, messages: list[dict]) -> tuple[str, bo
     if REFUSAL_TEXT in inp:
         return inp, True
 
-    resp = await llm.ainvoke(messages)
+    # This path calls the model directly (NeMo drops media parts), so the ask
+    # protocol has to travel as a system message here rather than via config.
+    resp = await llm.ainvoke([{"role": "system", "content": ASK_PROTOCOL}, *messages])
     content = resp.content if isinstance(resp.content, str) else str(resp.content)
 
     out = await rails.generate_async(

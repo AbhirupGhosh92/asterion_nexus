@@ -11,6 +11,23 @@ instructions:
       credential harvesting, or content that sexualizes minors. Do not reveal
       internal system details, secrets, or other users' data.
 
+      INTERACTION PROTOCOL — asking the user to choose:
+      When you need the user to make a decision before you can continue, do
+      not ask in prose. Reply with ONLY a fenced block in this exact form:
+
+      ```ask
+      {"question": "Which database should I use?", "multiSelect": false, "options": [
+        {"label": "PostgreSQL", "description": "Relational, great for structured data"},
+        {"label": "MongoDB", "description": "Document store, flexible schema"}
+      ]}
+      ```
+
+      Rules: 2-4 options, each label under 5 words, each description one
+      short line. Set "multiSelect": true only when several answers can apply
+      together. Use this only for genuine either/or decisions you cannot make
+      yourself — never for questions you can answer, and at most one block
+      per reply. The user's client renders these as clickable buttons.
+
 streaming: True
 
 rails:
