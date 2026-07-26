@@ -67,19 +67,36 @@ ensure_foundations() {
     | grep -q defaultUrl \
     || gapi -X POST "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites?siteId=$FIREBASE_SITE" >/dev/null
 
-  # Authorize the hosting domain for Google sign-in.
-  gapi "https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID/config" | python3 - "$FIREBASE_SITE" <<'PY' > /tmp/nexus_domains.json
+  # Authorize the hosting domain for Google sign-in. Best-effort: if Identity
+  # Platform isn't initialized yet, deploying still succeeds — you'd just add
+  # the domain under Firebase console → Authentication → Settings.
+  authorize_hosting_domain || warn "Could not auto-authorize $FIREBASE_SITE.web.app for sign-in — add it in Firebase console → Authentication → Settings → Authorized domains"
+  ok "Foundations ready"
+}
+
+authorize_hosting_domain() {
+  local cfg_file="${TMPDIR:-/tmp}/nexus_authcfg.json"
+  local patch_file="${TMPDIR:-/tmp}/nexus_domains.json"
+
+  gapi "https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID/config" > "$cfg_file" || return 1
+  # NOTE: read the response from a FILE, not a pipe — `cmd | python3 - <<EOF`
+  # feeds the heredoc to stdin, silently discarding the piped payload.
+  python3 - "$FIREBASE_SITE" "$cfg_file" > "$patch_file" <<'PY' || return 1
 import json, sys
-cfg = json.load(sys.stdin)
-domains = cfg.get("authorizedDomains", [])
+
+with open(sys.argv[2]) as fh:
+    cfg = json.load(fh)
+domains = cfg.get("authorizedDomains")
+if domains is None:
+    raise SystemExit("auth config has no authorizedDomains")
 site = f"{sys.argv[1]}.web.app"
-if site not in domains: domains.append(site)
+if site not in domains:
+    domains.append(site)
 print(json.dumps({"authorizedDomains": domains}))
 PY
   gapi -X PATCH \
     "https://identitytoolkit.googleapis.com/v2/projects/$PROJECT_ID/config?updateMask=authorizedDomains" \
-    -d @/tmp/nexus_domains.json >/dev/null
-  ok "Foundations ready"
+    -d @"$patch_file" >/dev/null || return 1
 }
 
 # ── secrets for the Dify engine ─────────────────────────────────────────────
