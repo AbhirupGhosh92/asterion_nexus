@@ -105,6 +105,11 @@ State is plain `useState` — no Redux/router. The app has exactly two screens
 
 ## 5. Common changes, step by step
 
+**Branch first.** Every change starts on its own branch off `main`
+(`git checkout -b feat/my-thing`); `main` stays releasable and each change
+stays reviewable.
+
+
 **Add an API endpoint**
 ```python
 # fast_api_app.py (must start with /api/ — the prod proxy only forwards /api/**)

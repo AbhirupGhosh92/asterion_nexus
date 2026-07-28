@@ -9,6 +9,22 @@ Deployment-specific facts (project ids, accounts, URLs) live in
 `CLAUDE.local.md` (gitignored) and `deploy.config` — read those first if
 they exist; never commit their contents.
 
+## Git workflow (required)
+
+**Every change request starts on its own branch — never commit to `main`.**
+
+```bash
+git checkout main && git pull        # start from current main
+git checkout -b feat/<short-slug>    # feat| fix| chore| docs| refactor
+```
+
+Commit the work there and report the branch name when done. Do **not** merge
+or push unless asked — that's the user's call. Follow-up tweaks to the same
+in-flight work stay on the same branch.
+
+Note: `./deploy.sh` builds from the working tree, so deploying while on a
+feature branch ships that branch's code.
+
 ## Commands
 
 ```bash
