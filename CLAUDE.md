@@ -22,6 +22,11 @@ Commit the work there and report the branch name when done. Do **not** merge
 or push unless asked — that's the user's call. Follow-up tweaks to the same
 in-flight work stay on the same branch.
 
+`main` is protected on GitHub: no force-push, no deletion, a PR is required,
+and the `ci` check (`.github/workflows/ci.yml` — frontend build + backend
+import) must pass. Approvals aren't required, so the maintainer can merge
+their own PRs; admins can bypass in an emergency.
+
 Note: `./deploy.sh` builds from the working tree, so deploying while on a
 feature branch ships that branch's code.
 
