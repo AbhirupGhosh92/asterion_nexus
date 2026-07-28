@@ -174,12 +174,24 @@ class AgentSpec(BaseModel):
     name: str
     instructions: str
     model: str = "gemini-2.5-flash"
-    min_tier: str = "free"
+    min_tier: str = "pro"
     tools: list[str] = Field(default_factory=list)
+    # Which runtime builds this agent: "langgraph" (in-process deep agent) or
+    # "dify" (external engine). They have separate tool catalogs.
+    engine: str = "langgraph"
 
 
 @router.get("/tools")
-async def list_tools(request: Request):
+async def list_tools(request: Request, engine: str = "langgraph"):
+    """The tool arsenal for an engine — the two runtimes don't share one."""
+    if engine == "langgraph":
+        from providers.agent_tools import TOOL_CATALOG as DEEP_CATALOG
+
+        return [
+            {"id": k, "label": v["label"], "description": v["description"]}
+            for k, v in DEEP_CATALOG.items()
+        ]
+
     from providers.dify import TOOL_CATALOG
 
     catalog = dict(TOOL_CATALOG)
@@ -269,12 +281,34 @@ async def delete_mcp_server(provider_id: str, request: Request,
 
 @router.get("/agents")
 async def list_agents(request: Request):
+    from services.registry_service import AGENT_PROVIDERS
+
     models = await request.app.state.registry.list_all()
-    return [m for m in models if m.get("provider") == "dify"]
+    return [m for m in models if m.get("provider") in AGENT_PROVIDERS]
 
 
 @router.post("/agents")
 async def create_agent(body: AgentSpec, request: Request, admin: AuthedUser = Depends(require_admin)):
+    if body.engine == "langgraph":
+        # Nothing external to provision: a deep agent is its spec, compiled on
+        # first use from the registry entry.
+        from providers.agent_tools import TOOL_CATALOG as DEEP_CATALOG
+
+        unknown = [t for t in body.tools if t not in DEEP_CATALOG]
+        if unknown:
+            raise HTTPException(400, f"Unknown tools for langgraph: {unknown}")
+        await request.app.state.registry.upsert(f"agent-{body.id}", {
+            "label": f"◈ {body.name}",
+            "provider": "langgraph",
+            "model": body.model,
+            "min_tier": body.min_tier,
+            "enabled": True,
+            "extra": {"instructions": body.instructions,
+                      "tools": ",".join(body.tools)},
+        })
+        log.info("admin %s created deep agent %s", admin.email, body.id)
+        return {"id": f"agent-{body.id}", "engine": "langgraph"}
+
     dify = request.app.state.registry.dify
     if dify is None or not dify.enabled:
         raise HTTPException(503, "Dify is not configured (DIFY_BASE_URL / admin creds)")
@@ -299,16 +333,20 @@ async def create_agent(body: AgentSpec, request: Request, admin: AuthedUser = De
 
 @router.delete("/agents/{model_id}")
 async def delete_agent(model_id: str, request: Request, admin: AuthedUser = Depends(require_admin)):
+    from services.registry_service import AGENT_PROVIDERS
+
     registry = request.app.state.registry
     spec = next((m for m in await registry.list_all() if m["id"] == model_id), None)
-    if spec is None or spec.get("provider") != "dify":
+    if spec is None or spec.get("provider") not in AGENT_PROVIDERS:
         raise HTTPException(404, "Agent not found")
+
+    # A deep agent has no external resource to release; a Dify one owns an app.
     app_id = (spec.get("extra") or {}).get("app_id")
-    if app_id and registry.dify and registry.dify.enabled:
+    if spec["provider"] == "dify" and app_id and registry.dify and registry.dify.enabled:
         try:
             await registry.dify.delete_agent(app_id)
         except Exception as exc:
             log.warning("Dify app delete failed (continuing): %s", exc)
     await registry.delete(model_id)
-    log.info("admin %s deleted dify agent %s", admin.email, model_id)
+    log.info("admin %s deleted %s agent %s", admin.email, spec["provider"], model_id)
     return {"deleted": model_id}

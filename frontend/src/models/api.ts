@@ -192,8 +192,12 @@ export const adminApi = {
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
     return res.json();
   },
-  listTools: async (): Promise<{ id: string; label: string; description: string }[]> => {
-    const res = await authedFetch("/api/admin/tools");
+  // The two agent runtimes have separate tool catalogs — in-process Python
+  // tools for langgraph, installed plugins for dify.
+  listTools: async (
+    engine: string,
+  ): Promise<{ id: string; label: string; description: string }[]> => {
+    const res = await authedFetch(`/api/admin/tools?engine=${encodeURIComponent(engine)}`);
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
     return res.json();
   },
@@ -204,6 +208,7 @@ export const adminApi = {
     model: string;
     min_tier: string;
     tools: string[];
+    engine: string;
   }): Promise<void> => {
     const res = await authedFetch("/api/admin/agents", {
       method: "POST",

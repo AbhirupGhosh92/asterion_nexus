@@ -7,6 +7,13 @@ import type {
 // Specialist agents are a Pro capability — the backend floors any lower
 // min_tier at "pro", so offering "free" here would be a lying control.
 const TIERS = ["pro", "admin"];
+
+// Two runtimes. LangGraph deep agents are the default: they run in-process,
+// so they need no engine running and no external app to provision.
+const ENGINES = [
+  { id: "langgraph", label: "◈ DEEP AGENT (LangGraph)" },
+  { id: "dify", label: "⚡ DIFY ENGINE" },
+];
 const PROVIDERS = ["vertexai", "vertexai_image", "ollama", "mock"];
 const EMPTY_MODEL: AdminModel = {
   id: "", label: "", provider: "vertexai", model: "",
@@ -30,14 +37,21 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
     model: "gemini-2.5-flash",
     min_tier: "pro",
     tools: [] as string[],
+    engine: "langgraph",
   });
 
   const refresh = () => adminApi.listAgents().then(setAgents).catch((e) => onError(String(e)));
   useEffect(() => {
     refresh();
-    adminApi.listTools().then(setTools).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Each engine has its own arsenal, and a tool selected for one is
+  // meaningless to the other — so switching engines clears the loadout.
+  useEffect(() => {
+    adminApi.listTools(draft.engine).then(setTools).catch(() => setTools([]));
+    setDraft((d) => ({ ...d, tools: [] }));
+  }, [draft.engine]);
 
   function toggleTool(id: string) {
     setDraft((d) => ({
@@ -55,14 +69,15 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
     setBusy(true);
     try {
       await adminApi.createAgent(draft);
-      setDraft({
+      setDraft((d) => ({
         id: "",
         name: "",
         instructions: "",
         model: "gemini-2.5-flash",
         min_tier: "pro",
         tools: [],
-      });
+        engine: d.engine, // forging several agents on one engine is the norm
+      }));
       refresh();
     } catch (e) {
       onError(String(e));
@@ -85,6 +100,16 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
     <div className="admin-scroll">
       <div className="agent-form">
         <div className="agent-form-row">
+          <select
+            className="admin-select"
+            value={draft.engine}
+            onChange={(e) => setDraft({ ...draft, engine: e.target.value })}
+            title="Which runtime executes this agent"
+          >
+            {ENGINES.map((e) => (
+              <option key={e.id} value={e.id}>{e.label}</option>
+            ))}
+          </select>
           <input
             className="admin-input"
             placeholder="id (e.g. researcher)"
@@ -151,6 +176,7 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
         <thead>
           <tr>
             <th>AGENT</th>
+            <th>ENGINE</th>
             <th>MODEL</th>
             <th>TOOLS</th>
             <th>MIN TIER</th>
@@ -160,8 +186,8 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
         <tbody>
           {agents.length === 0 && (
             <tr>
-              <td colSpan={5} className="cell-dim">
-                no agents forged yet — they appear in every user's model selector once created
+              <td colSpan={6} className="cell-dim">
+                no agents forged yet — they appear on every Pro user's homepage once created
               </td>
             </tr>
           )}
@@ -172,6 +198,9 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
                   <span>{a.label}</span>
                   <span className="cell-uid">{a.id}</span>
                 </div>
+              </td>
+              <td className="cell-dim">
+                {a.provider === "langgraph" ? "◈ DEEP" : "⚡ DIFY"}
               </td>
               <td className="cell-dim">{a.model}</td>
               <td className="cell-dim">{a.extra?.tools || "—"}</td>

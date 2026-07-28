@@ -76,6 +76,8 @@ export interface SpecialistAgent {
   min_tier: string;
   locked: boolean;
   online: boolean;
+  /** Which runtime executes it: "langgraph" (in-process) or "dify". */
+  engine: string;
 }
 
 export interface EngineStatus {

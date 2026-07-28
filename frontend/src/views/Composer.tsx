@@ -37,7 +37,12 @@ export default function Composer({
         {profile && profile.models.length > 1 && (
           <select
             className="model-select"
-            value={model ?? profile.models[0]?.id}
+            // Mirror the backend's fallback: with no explicit choice it uses
+            // the `default` entry, never whichever id happens to sort first.
+            // Showing models[0] here made the picker claim an agent was
+            // active while plain Gemini answered.
+            value={model ?? (profile.models.find((m) => m.id === "default")?.id
+              ?? profile.models[0]?.id)}
             onChange={(e) => setModel(e.target.value)}
             title="Model"
           >

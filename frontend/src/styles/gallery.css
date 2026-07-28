@@ -270,3 +270,14 @@
   color: var(--text-dim);
   opacity: 0.8;
 }
+
+/* Which runtime executes an agent — dim by design: useful when debugging,
+   not something a user needs to think about. */
+.agent-engine {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  opacity: 0.65;
+}
