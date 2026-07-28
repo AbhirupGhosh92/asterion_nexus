@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_admin import auth as fb_auth
 from pydantic import BaseModel, Field
 
-from auth import TIER_RANK, AuthedUser, require_admin
+from core.auth import TIER_RANK, AuthedUser, require_admin
 
 log = logging.getLogger("ai-platform.admin")
 
@@ -180,7 +180,7 @@ class AgentSpec(BaseModel):
 
 @router.get("/tools")
 async def list_tools(request: Request):
-    from dify import TOOL_CATALOG
+    from providers.dify import TOOL_CATALOG
 
     catalog = dict(TOOL_CATALOG)
     dify = request.app.state.registry.dify
@@ -217,7 +217,7 @@ class EngineAction(BaseModel):
 
 @router.get("/engine")
 async def engine_status(request: Request):
-    import dify_ops
+    import services.engine_service as dify_ops
 
     return await dify_ops.status(
         request.app.state.registry.dify, request.app.state.registry
@@ -227,7 +227,7 @@ async def engine_status(request: Request):
 @router.post("/engine")
 async def engine_control(body: EngineAction, request: Request,
                          admin: AuthedUser = Depends(require_admin)):
-    import dify_ops
+    import services.engine_service as dify_ops
 
     try:
         result = await dify_ops.control(body.action)

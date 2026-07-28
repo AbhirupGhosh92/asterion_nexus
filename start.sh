@@ -70,7 +70,7 @@ else
   unset AUTH_DISABLED || true
 fi
 
-nohup .venv/bin/uvicorn fast_api_app:app --port 8080 > "$LOG_DIR/backend.log" 2>&1 &
+nohup .venv/bin/uvicorn app:app --port 8080 > "$LOG_DIR/backend.log" 2>&1 &
 echo $! > "$PID_DIR/backend.pid"
 cd "$ROOT"
 

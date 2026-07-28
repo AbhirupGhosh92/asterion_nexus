@@ -30,6 +30,29 @@ their own PRs; admins can bypass in an emergency.
 Note: `./deploy.sh` builds from the working tree, so deploying while on a
 feature branch ships that branch's code.
 
+## Architecture — read the nested CLAUDE.md files first
+
+The codebase is MVVM-layered, and **every layer has its own CLAUDE.md with a
+per-file map**. Read the one for the layer you're touching instead of
+scanning the tree:
+
+```
+backend/CLAUDE.md            layering + invariants      (start here for API work)
+  routers/     View          HTTP only
+  services/    ViewModel     orchestration (chat_service is the big one)
+  repositories/ Model        Firestore / Storage / Memory Bank
+  providers/   Model         LLMs, Dify, guardrail adapters
+  models/ core/              schemas, config, auth
+
+frontend/src/CLAUDE.md       layering + the no-fetch-in-views rule
+  models/      Model         types + API client
+  viewmodels/  ViewModel     hooks: useChat, useAuth, useConversations
+  views/       View          components (views/admin/ = control plane)
+```
+
+Dependencies point one way: `routers → services → repositories/providers →
+models/core`, and in the UI `views → viewmodels → models`.
+
 ## Commands
 
 ```bash
@@ -40,20 +63,20 @@ feature branch ships that branch's code.
                                               # sole always-on billed resource)
 
 # Backend alone (venv is Python 3.12 via uv — don't use system python if newer)
-cd backend && set -a && source .env && set +a && .venv/bin/uvicorn fast_api_app:app --port 8080
+cd backend && set -a && source .env && set +a && .venv/bin/uvicorn app:app --port 8080
 
 # Type checks
 cd frontend && npx tsc -b
-cd backend && .venv/bin/python -c "import fast_api_app"
+cd backend && .venv/bin/python -c "import app"
 ```
 
 ## Security invariants (do not weaken)
 
 1. Every uid used for data scoping comes from the **verified Firebase token**
-   (`auth.verify_firebase_token`), never from request bodies.
+   (`core/auth.verify_firebase_token`), never from request bodies.
 2. All LLM traffic passes NeMo Guardrails. Text turns: full rails. Multimodal
    / Dify / image turns: staged rails via `options={"rails": ["input"|"output"]}`
-   (NeMo drops media parts, hence the hybrid path in `fast_api_app._guarded_multimodal`).
+   (NeMo drops media parts, hence the hybrid path in `services/chat_service._guarded_multimodal`).
 3. Admin surface (`/api/admin/*`) is gated by `ADMIN_EMAILS` (.env), an
    identity allowlist — tiers do NOT grant admin.
 4. Clients never talk to Firestore/Storage/Dify directly — everything goes
@@ -64,10 +87,10 @@ cd backend && .venv/bin/python -c "import fast_api_app"
 ## Gotchas learned the hard way
 
 - Dify console auth: cookie + CSRF (`X-CSRF-Token` header), and the login
-  password must be **base64-encoded** (`dify.py` handles it).
+  password must be **base64-encoded** (`providers/dify.py` handles it).
 - Dify agent-chat apps are **streaming-only** (`response_mode: streaming`).
 - Classic Imagen models 404 on Vertex since June 2026 — image gen uses
-  `gemini-2.5-flash-image` via the `google-genai` SDK (`imagegen.py`).
+  `gemini-2.5-flash-image` via the `google-genai` SDK (`providers/image_rails.py`).
 - NeMo `stream_async` requires `rails.output.streaming.enabled: True` in
   `backend/guardrails/config.yml`.
 - Firebase Hosting rewrites cover `/api/**` only — new backend routes must
@@ -95,7 +118,7 @@ the test user's email to `ADMIN_EMAILS` in the shell env — never in `.env`.
 
 ## Extension points
 
-- New LLM/provider → `backend/providers.py` + entry via admin MODEL GRID.
-- New built-in agent tool → install Dify plugin + one `TOOL_CATALOG` entry in `backend/dify.py`.
+- New LLM/provider → `backend/providers/llm.py` + entry via admin MODEL GRID.
+- New built-in agent tool → install Dify plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py`.
 - New MCP connector → admin MCP LINKS tab (URL, optional headers). Tools join the arsenal automatically.
 - New route → keep under `/api/`, take `AuthedUser` via Depends, scope by `user.uid`.

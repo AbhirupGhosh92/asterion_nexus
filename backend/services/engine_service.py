@@ -141,7 +141,7 @@ async def status(dify, registry) -> dict:
 
     if info["reachable"]:
         try:
-            from dify import TOOL_CATALOG
+            from providers.dify import TOOL_CATALOG
 
             r = await dify._console(
                 "GET", "/workspaces/current/plugin/list"

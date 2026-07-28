@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
 from google.cloud import firestore
 
-from auth import AuthedUser, verify_firebase_token
+from core.auth import AuthedUser, verify_firebase_token
 
 log = logging.getLogger("ai-platform.quota")
 
