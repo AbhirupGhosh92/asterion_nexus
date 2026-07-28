@@ -91,7 +91,15 @@ export interface EngineStatus {
   mcp_servers: number;
   agents: number;
   containers?: { running: number; total: number; names?: string[]; error?: string };
-  vm?: { status: string; error?: string };
+  vm?: {
+    status: string;
+    error?: string;
+    ip?: string;
+    machine_type?: string;
+    /** GCE is still settling a start/stop — keep polling. */
+    transitioning?: boolean;
+    billing?: string;
+  };
 }
 
 export interface McpServer {

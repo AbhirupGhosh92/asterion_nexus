@@ -230,6 +230,14 @@ screening model answers Yes/No to. Restart the backend.
 **Give a user pro/admin tier** — admin panel → OPERATIVES → dropdown. The
 change lands at their next token refresh (≤1 h) or re-login.
 
+**Controlling the cloud Dify engine** — admin panel → ENGINE. It shows the
+VM's state, IP and machine type, and START/RESTART/STOP call Compute Engine
+directly from the backend (`services/engine_service.py`, a narrow custom IAM
+role on that one instance). Stopping the VM is what actually pauses its
+billing. The panel polls after a command because a VM reaches RUNNING in
+~30 s while Dify's containers need another minute or two — the VM's startup
+script runs `docker compose up -d` on every boot.
+
 ## 6. Testing without a real login
 
 You can't type your Google password into scripts — instead mint a *custom
@@ -265,6 +273,9 @@ builds only).
 | Guardrails refuse everything | `guardrails/config.yml` prompts too strict; check backend log — each rail decision is logged |
 | 429 on chat | Monthly quota exhausted — admin → QUOTAS to raise tier limits, or OPERATIVES to override/reset that user |
 | Dify calls fail | Is the stack up? (`docker compose ps` in `infra/dify/docker`) Login quirk: password must be base64'd (handled in `dify.py`) |
+| ENGINE tab buttons disabled in prod | No VM deployed — `WITH_DIFY="true"` in `deploy.config` + `./deploy.sh`. Terraform creates the VM, wires `DIFY_VM_NAME`/`DIFY_VM_ZONE` into Cloud Run and grants the compute role |
+| ENGINE shows VM `FORBIDDEN` | Cloud Run's service account lost the `difyVmOperator` custom role — re-run `./deploy.sh` |
+| Pre-commit hook doesn't run | `git config core.hooksPath` should be `.githooks` — run `./scripts/install-hooks.sh` (git never installs hooks from a clone) |
 | Deep agent answers without using tools | Instructions too soft — say "use your tools for every fact, never answer from memory". Check the trace: no steps means no tool calls were made |
 | Deep agent loops | `RECURSION_LIMIT` in `providers/deep_agents.py` caps the loop; a hit means the task needs sub-agents or tighter instructions |
 | Agent missing from the gallery | Agents are Pro-floored — check the user's tier; Dify agents also vanish when the engine is unreachable, deep agents never do |

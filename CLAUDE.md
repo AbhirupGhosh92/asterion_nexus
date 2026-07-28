@@ -123,6 +123,20 @@ cd backend && .venv/bin/python -c "import app"
   its own `styles/*.css`; appending to a shared tail is how a merge once
   silently deleted an entire feature's styling.
 
+## Secret scanning
+
+`.githooks/pre-commit` → `scripts/scan_secrets.py` blocks commits that add
+key material, provider tokens, credential-shaped values, or files that should
+never be tracked (`.env`, `*-sa.json`, `.pem`, `deploy.config`,
+`CLAUDE.local.md`). `./start.sh` installs the hook; CI runs
+`scan_secrets.py --all` over the tree so `--no-verify` is visible, not silent.
+False positive → append `pragma: allowlist secret` to the line.
+
+When adding patterns: keep alternations **non-capturing**. The generic rule
+reads `(?P<value>…)` to judge whether a value looks random, and a stray
+capture group makes the code judge the literal prefix instead — silently
+disarming the rule.
+
 ## E2E testing recipe (no user password ever)
 
 Mint a custom token for a synthetic uid (e.g. `e2e-tester`) with

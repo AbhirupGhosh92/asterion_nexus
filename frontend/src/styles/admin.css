@@ -296,3 +296,14 @@
 /* =========================================================================
    Responsive — tablet & phone: sidebar becomes an off-canvas drawer
    ========================================================================= */
+
+/* Engine tab: VM identity + warnings under the stat row. */
+.engine-vm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  font-size: 0.7rem;
+}
+
+.engine-warn { color: var(--neon-amber); font-family: var(--font-mono); font-size: 0.68rem; }
