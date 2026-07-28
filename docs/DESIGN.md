@@ -260,6 +260,14 @@ Ops: `docker compose -f infra/dify/docker/docker-compose.yaml up -d|down`.
 
 ### 5.1f Image generation
 
+Vertex's image model is rate-limited to a few requests per minute, and a 429
+looks nothing like a bad prompt — so `imagegen.py` retries 429s with
+exponential backoff (4 attempts: 5s/10s/20s) and reports an accurate reason
+when it finally gives up. It also sends the last few conversation turns as
+`contents` (image tokens stripped) so follow-ups like "make it blue instead"
+resolve, and treats a text-only reply as a message to show rather than an
+error — the model is conversational and sometimes answers instead of drawing.
+
 "🎨 Image Studio" is a registry model with provider `vertexai_image`
 (`backend/imagegen.py`): the prompt passes INPUT rails, then
 `gemini-2.5-flash-image` generates via the google-genai SDK (classic Imagen
