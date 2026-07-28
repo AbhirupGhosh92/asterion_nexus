@@ -99,21 +99,14 @@ export function useChat(opts: {
     setPending((cur) => cur.filter((p) => p.meta.id !== id));
   }, []);
 
-  const send = useCallback(
-    async (override?: string) => {
-      const text = (override ?? input).trim();
-      if ((!text && pending.length === 0) || busy) return;
-
-      const attachments = pending;
-      setPending([]);
-      if (override === undefined) setInput("");
+  /**
+   * Run one turn against `history` (which must already end with the user
+   * message). Shared by send and retry so both behave identically.
+   */
+  const runTurn = useCallback(
+    async (history: UiMessage[], attachments: Attachment[]) => {
       setBusy(true);
-
-      const userMsg: UiMessage = {
-        id: nextId++, role: "user", content: text || "(attachment)", attachments,
-      };
       const botMsg: UiMessage = { id: nextId++, role: "assistant", content: "", streaming: true };
-      const history = [...messages, userMsg];
       setMessages([...history, botMsg]);
 
       const patch = (fn: (m: UiMessage) => UiMessage) =>
@@ -153,14 +146,45 @@ export function useChat(opts: {
         setBusy(false);
       }
     },
-    [activeId, busy, input, messages, model, onConversationsChanged, pending,
-     refreshProfile, setActiveId],
+    [activeId, model, onConversationsChanged, refreshProfile, setActiveId],
+  );
+
+  const send = useCallback(
+    async (override?: string) => {
+      const text = (override ?? input).trim();
+      if ((!text && pending.length === 0) || busy) return;
+
+      const attachments = pending;
+      setPending([]);
+      if (override === undefined) setInput("");
+
+      const userMsg: UiMessage = {
+        id: nextId++, role: "user", content: text || "(attachment)", attachments,
+      };
+      await runTurn([...messages, userMsg], attachments);
+    },
+    [busy, input, messages, pending, runTurn],
+  );
+
+  /**
+   * Re-send an earlier user message. Everything after it is dropped, so the
+   * reply is regenerated rather than appended — the original attachments are
+   * reused (their uploads still exist server-side).
+   */
+  const retry = useCallback(
+    async (messageId: number) => {
+      if (busy) return;
+      const idx = messages.findIndex((m) => m.id === messageId);
+      if (idx < 0 || messages[idx].role !== "user") return;
+      await runTurn(messages.slice(0, idx + 1), messages[idx].attachments ?? []);
+    },
+    [busy, messages, runTurn],
   );
 
   return {
     messages, input, setInput, busy, profile, model, setModel,
     pending, uploading, pinned,
     scrollRef, composerRef, fileRef,
-    send, pickFiles, dropAttachment, reset, load, handleScroll, scrollToBottom,
+    send, retry, pickFiles, dropAttachment, reset, load, handleScroll, scrollToBottom,
   };
 }
