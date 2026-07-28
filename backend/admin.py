@@ -208,6 +208,40 @@ def _dify_or_503(request: Request):
     return dify
 
 
+# --------------------------------------------------------------------------- #
+# Dify engine — status and lifecycle
+# --------------------------------------------------------------------------- #
+class EngineAction(BaseModel):
+    action: str  # start | stop | restart
+
+
+@router.get("/engine")
+async def engine_status(request: Request):
+    import dify_ops
+
+    return await dify_ops.status(
+        request.app.state.registry.dify, request.app.state.registry
+    )
+
+
+@router.post("/engine")
+async def engine_control(body: EngineAction, request: Request,
+                         admin: AuthedUser = Depends(require_admin)):
+    import dify_ops
+
+    try:
+        result = await dify_ops.control(body.action)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    log.info("admin %s ran engine %s -> ok=%s", admin.email, body.action, result["ok"])
+    # A restarted engine changes which agents are reachable; drop the cached
+    # probe so the next status/model list reflects reality immediately.
+    dify = request.app.state.registry.dify
+    if dify is not None:
+        dify._up_at = 0.0
+    return result
+
+
 @router.get("/mcp")
 async def list_mcp_servers(request: Request):
     return await _dify_or_503(request).list_mcp_servers()
