@@ -255,6 +255,21 @@ export const adminApi = {
     const res = await authedFetch(`/api/admin/agents/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
   },
+  engineStatus: async (): Promise<EngineStatus> => {
+    const res = await authedFetch("/api/admin/engine");
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+    return res.json();
+  },
+  engineControl: async (
+    action: "start" | "stop" | "restart",
+  ): Promise<{ ok: boolean; output: string }> => {
+    const res = await authedFetch("/api/admin/engine", {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+    return res.json();
+  },
   listMcp: async (): Promise<McpServer[]> => {
     const res = await authedFetch("/api/admin/mcp");
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
@@ -273,6 +288,20 @@ export const adminApi = {
     if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
   },
 };
+
+export interface EngineStatus {
+  mode: "docker" | "vm" | "external" | "none";
+  configured: boolean;
+  base_url: string;
+  controllable: boolean;
+  reachable: boolean;
+  plugins: string[];
+  tools: number;
+  mcp_servers: number;
+  agents: number;
+  containers?: { running: number; total: number; names?: string[]; error?: string };
+  vm?: { status: string; error?: string };
+}
 
 export interface McpServer {
   provider_id: string;

@@ -264,6 +264,23 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
+      # Identifies the engine VM so the admin panel's ENGINE tab can read its
+      # state and start/stop it (see the difyVmOperator role below).
+      dynamic "env" {
+        for_each = var.with_dify ? [1] : []
+        content {
+          name  = "DIFY_VM_NAME"
+          value = google_compute_instance.dify[0].name
+        }
+      }
+      dynamic "env" {
+        for_each = var.with_dify ? [1] : []
+        content {
+          name  = "DIFY_VM_ZONE"
+          value = google_compute_instance.dify[0].zone
+        }
+      }
+
       startup_probe {
         http_get {
           path = "/healthz"
@@ -342,6 +359,30 @@ resource "google_project_iam_member" "dify_vertex_user" {
   project = var.project_id
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.dify_vertex[0].email}"
+}
+
+# Least-privilege lifecycle control for the admin panel: read state and
+# start/stop/reset the engine VM — and nothing else (no create, no delete,
+# no disk or network access). Deleting the VM stays a deliberate act via
+# ./teardown-dify.sh, never a button in the UI.
+resource "google_project_iam_custom_role" "dify_vm_operator" {
+  count       = var.with_dify ? 1 : 0
+  role_id     = "difyVmOperator"
+  title       = "Dify Engine VM Operator"
+  description = "Read and start/stop/reset the Dify engine VM"
+  permissions = [
+    "compute.instances.get",
+    "compute.instances.start",
+    "compute.instances.stop",
+    "compute.instances.reset",
+  ]
+}
+
+resource "google_project_iam_member" "api_dify_vm_operator" {
+  count   = var.with_dify ? 1 : 0
+  project = var.project_id
+  role    = google_project_iam_custom_role.dify_vm_operator[0].id
+  member  = "serviceAccount:${google_service_account.api.email}"
 }
 
 resource "google_compute_instance" "dify" {
