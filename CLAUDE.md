@@ -119,6 +119,11 @@ the test user's email to `ADMIN_EMAILS` in the shell env — never in `.env`.
 ## Extension points
 
 - New LLM/provider → `backend/providers/llm.py` + entry via admin MODEL GRID.
-- New built-in agent tool → install Dify plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py`.
+- New specialist agent → admin AGENTS tab. Two runtimes: **LangGraph deep
+  agents** (default, in-process, `providers/deep_agents.py`) and Dify.
+- New deep-agent tool → one `@tool` function + a `TOOL_CATALOG` entry in
+  `backend/providers/agent_tools.py`. No engine, no plugin, no restart of
+  anything else.
+- New Dify agent tool → install the plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py`.
 - New MCP connector → admin MCP LINKS tab (URL, optional headers). Tools join the arsenal automatically.
 - New route → keep under `/api/`, take `AuthedUser` via Depends, scope by `user.uid`.

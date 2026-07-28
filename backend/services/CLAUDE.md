@@ -32,7 +32,10 @@ Adding a fourth path? Give the adapter the same duck-typed shape
   `StreamingResponse` sends headers — otherwise a tier/quota `HTTPException`
   can only truncate the body and the client sees an empty `200`.
 - Specialist agents are a Pro capability. `effective_min_tier` raises any
-  `provider="dify"` model to at least `pro`, and both `list_for_tier` (what
-  the composer offers, and what `get_rails` allows) and `list_agents` (the
-  gallery's `locked` flag) go through it — so the gate can't disagree with
-  the badge.
+  model whose provider is in `AGENT_PROVIDERS` (`dify`, `langgraph`) to at
+  least `pro`, and both `list_for_tier` (what the composer offers, and what
+  `get_rails` allows) and `list_agents` (the gallery's `locked` flag) go
+  through it — so the gate can't disagree with the badge.
+- `AGENT_PROVIDERS` is the single place that knows which providers are
+  agents. Adding a third runtime means adding it there and a branch in
+  `_build_rails`; nothing above the registry changes.

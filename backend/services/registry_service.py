@@ -23,19 +23,23 @@ from providers.llm import MockRails, build_chat_llm
 
 log = logging.getLogger("ai-platform.models")
 
-PROVIDERS = ("vertexai", "ollama", "mock", "dify", "vertexai_image")
+PROVIDERS = ("vertexai", "ollama", "mock", "dify", "langgraph", "vertexai_image")
 
-# Specialist agents (provider="dify") are a Pro capability. A per-agent
-# min_tier can raise the bar (admin-only agents) but never lower it — so the
-# homepage gallery and the composer's model list can't disagree about who may
-# run one.
+# The two agent runtimes. `dify` runs in an external engine; `langgraph` is a
+# deep agent built in-process (providers/deep_agents.py). Both answer to the
+# same rails contract, so everything below treats them together.
+AGENT_PROVIDERS = ("dify", "langgraph")
+
+# Specialist agents are a Pro capability. A per-agent min_tier can raise the
+# bar (admin-only agents) but never lower it — so the homepage gallery and the
+# composer's model list can't disagree about who may run one.
 AGENT_FLOOR_TIER = "pro"
 
 
 def effective_min_tier(spec: dict) -> str:
     """The tier actually required for a model, applying the agent floor."""
     min_tier = spec.get("min_tier", "free")
-    if spec.get("provider") != "dify":
+    if spec.get("provider") not in AGENT_PROVIDERS:
         return min_tier
     return min_tier if TIER_RANK.get(min_tier, 0) > TIER_RANK[AGENT_FLOOR_TIER] else AGENT_FLOOR_TIER
 
@@ -109,11 +113,14 @@ class ModelRegistry:
         `locked: false` client-side buys nothing.
         """
         rank = TIER_RANK.get(tier, 0)
-        online = self.dify is not None and await self.dify.is_up()
+        dify_up = self.dify is not None and await self.dify.is_up()
         out = []
         for m in await self.list_all():
-            if m.get("provider") != "dify" or not m.get("enabled"):
+            if m.get("provider") not in AGENT_PROVIDERS or not m.get("enabled"):
                 continue
+            # Deep agents run in this process, so they are online whenever the
+            # backend is; only Dify agents depend on a reachable engine.
+            online = dify_up if m["provider"] == "dify" else True
             extra = m.get("extra") or {}
             min_tier = effective_min_tier(m)
             brief = (extra.get("instructions") or "").strip()
@@ -127,6 +134,7 @@ class ModelRegistry:
                 "min_tier": min_tier,
                 "locked": rank < TIER_RANK.get(min_tier, 0),
                 "online": online,
+                "engine": m["provider"],  # dify | langgraph
             })
         return out
 
@@ -182,7 +190,7 @@ class ModelRegistry:
         if self._rails_config is None:
             self._rails_config = RailsConfig.from_path(self._guardrails_path)
 
-        if spec["provider"] in ("dify", "vertexai_image"):
+        if spec["provider"] in ("dify", "langgraph", "vertexai_image"):
             # Screening rails run on the platform's default Vertex model.
             screen_llm = build_chat_llm("vertexai", project=self.project, region=self.region)
             screen_rails = LLMRails(self._rails_config, llm=screen_llm)
@@ -194,6 +202,25 @@ class ModelRegistry:
                     raise HTTPException(503, "Dify is not configured")
                 extra = spec.get("extra") or {}
                 return DifyRails(self.dify, extra["api_key"], screen_rails), None
+
+            if spec["provider"] == "langgraph":
+                from providers.deep_agents import DeepAgentRails, build_agent
+
+                extra = spec.get("extra") or {}
+                # The agent's own model, not the screening one: a deep agent
+                # may reason on a bigger model than the rails need. Passed
+                # explicitly so it can't leak into the next model built.
+                agent_llm = build_chat_llm(
+                    "vertexai", project=self.project, region=self.region,
+                    model=spec["model"],
+                )
+                agent = build_agent(
+                    llm=agent_llm,
+                    instructions=extra.get("instructions", ""),
+                    tools=[t for t in (extra.get("tools") or "").split(",") if t],
+                )
+                log.info("Built deep agent %s (%s)", spec["id"], spec["model"])
+                return DeepAgentRails(agent, screen_rails), None
 
             from providers.image_rails import ImageGenRails
 

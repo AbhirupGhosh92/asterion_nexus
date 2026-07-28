@@ -44,6 +44,14 @@ export default function AgentGallery({
                 <span className="agent-name">{a.label}</span>
                 {a.locked && <span className="agent-badge agent-badge-pro">🔒 PRO</span>}
                 {activeId === a.id && <span className="agent-badge agent-badge-on">● ACTIVE</span>}
+                <span
+                  className="agent-engine"
+                  title={a.engine === "langgraph"
+                    ? "LangGraph deep agent — runs in the backend"
+                    : "Dify engine agent"}
+                >
+                  {a.engine === "langgraph" ? "◈ deep" : "⚡ dify"}
+                </span>
               </div>
 
               <p className="agent-brief">{a.description || "No briefing provided."}</p>

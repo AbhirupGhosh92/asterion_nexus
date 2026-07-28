@@ -38,13 +38,18 @@ class MockRails:
             await asyncio.sleep(0.03)  # simulate token latency for UI work
 
 
-def build_chat_llm(provider: str, *, project: str = "", region: str = "us-central1"):
+def build_chat_llm(provider: str, *, project: str = "", region: str = "us-central1",
+                   model: str | None = None):
+    """A LangChain chat model. `model` overrides the env default for this
+    instance only — callers building a second model (a deep agent reasoning on
+    a bigger model than the rails screen with) must not mutate the global env
+    to do it."""
     if provider == "ollama":
         from langchain_ollama import ChatOllama
 
         return ChatOllama(
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-            model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
+            model=model or os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
             temperature=0.7,
         )
 
@@ -52,7 +57,7 @@ def build_chat_llm(provider: str, *, project: str = "", region: str = "us-centra
         from langchain_google_vertexai import ChatVertexAI
 
         return ChatVertexAI(
-            model_name=os.getenv("VERTEX_MODEL", "gemini-2.5-flash"),
+            model_name=model or os.getenv("VERTEX_MODEL", "gemini-2.5-flash"),
             project=project,
             location=region,
             temperature=0.7,
