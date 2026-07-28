@@ -131,6 +131,7 @@ export default function Workspace({ user }: { user: User | null }) {
                 busy={chat.busy}
                 onAnswer={(answer) => chat.send(answer)}
                 onOther={() => chat.composerRef.current?.focus()}
+                onRetry={chat.retry}
               />
             ))}
           </main>

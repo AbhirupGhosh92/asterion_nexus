@@ -4,7 +4,35 @@ import type { AgentStep, UiMessage } from "../models/types";
 import AskCard, { parseAsk } from "./AskCard";
 import Markdown from "./Markdown";
 
-/** Renders an [image:<id>] token as an authenticated image. */
+/** Saves an already-fetched object URL to disk under a readable name. */
+function downloadUrl(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** An image with a hover download button. */
+function ImageWithDownload({
+  url, filename, alt, className,
+}: { url: string; filename: string; alt: string; className: string }) {
+  return (
+    <span className="img-wrap">
+      <img className={className} src={url} alt={alt} />
+      <button
+        className="img-download"
+        title={`Download ${filename}`}
+        onClick={() => downloadUrl(url, filename)}
+      >
+        ↓
+      </button>
+    </span>
+  );
+}
+
+/** Renders an [image:<id>] token as an authenticated, downloadable image. */
 function GeneratedImage({ fileId }: { fileId: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -15,7 +43,48 @@ function GeneratedImage({ fileId }: { fileId: string }) {
 
   if (failed) return <span className="file-chip">⚠ image unavailable</span>;
   if (!url) return <span className="img-loading thinking-indicator">◢ rendering…</span>;
-  return <img className="msg-img msg-img-generated" src={url} alt="generated image" />;
+  return (
+    <ImageWithDownload
+      url={url}
+      filename={`nexus-${fileId.slice(0, 8)}.png`}
+      alt="generated image"
+      className="msg-img msg-img-generated"
+    />
+  );
+}
+
+/** Copy / retry actions shown under a user message. */
+function MessageActions({ text, onRetry }: { text: string; onRetry?: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Clipboard API needs a secure context; fall back to a hidden textarea.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <div className="msg-actions">
+      <button className="msg-action" onClick={copy} title="Copy this message">
+        {copied ? "✓ copied" : "⧉ copy"}
+      </button>
+      {onRetry && (
+        <button className="msg-action" onClick={onRetry} title="Send this message again">
+          ↻ retry
+        </button>
+      )}
+    </div>
+  );
 }
 
 const IMAGE_TOKEN = /\[image:([a-f0-9]{32})\]/g;
@@ -101,12 +170,14 @@ export default function MessageBubble({
   busy,
   onAnswer,
   onOther,
+  onRetry,
 }: {
   message: UiMessage;
   isLast: boolean;
   busy: boolean;
   onAnswer: (answer: string) => void;
   onOther: () => void;
+  onRetry?: (id: number) => void;
 }) {
   const isAssistant = m.role === "assistant" && !m.guardrail;
   // While streaming, an ask block is still half-written — hide the raw JSON
@@ -128,7 +199,13 @@ export default function MessageBubble({
           <div className="msg-attachments">
             {m.attachments.map((a) =>
               a.previewUrl ? (
-                <img key={a.meta.id} className="msg-img" src={a.previewUrl} alt={a.meta.name} />
+                <ImageWithDownload
+                  key={a.meta.id}
+                  url={a.previewUrl}
+                  filename={a.meta.name}
+                  alt={a.meta.name}
+                  className="msg-img"
+                />
               ) : (
                 <span key={a.meta.id} className="file-chip">▤ {a.meta.name}</span>
               ),
@@ -145,6 +222,12 @@ export default function MessageBubble({
           <AskCard ask={ask} live={isLast && !busy} onAnswer={onAnswer} onOther={onOther} />
         )}
       </div>
+      {m.role === "user" && !m.streaming && (
+        <MessageActions
+          text={m.content}
+          onRetry={onRetry && !busy ? () => onRetry(m.id) : undefined}
+        />
+      )}
     </div>
   );
 }
