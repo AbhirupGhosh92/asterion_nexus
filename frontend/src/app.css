@@ -1,3 +1,31 @@
+/* Layout + components on top of theme.css tokens.
+ *
+ * This file is a manifest, not a stylesheet: each feature area owns its own
+ * file under styles/, so two branches adding UI no longer append to one
+ * shared tail and collide. (That collision silently dropped the whole agent
+ * gallery once — see PR #19.)
+ *
+ * Import order is the cascade, so it matters:
+ *   structure → chrome → content → features → responsive
+ * responsive.css is last because it overrides everything above it.
+ *
+ * Adding a feature? New file here, one import line — don't append to
+ * another area's file unless the rules genuinely belong to it.
+ */
+
+@import "./styles/base.css";
+@import "./styles/sidebar.css";
+@import "./styles/hud.css";
+@import "./styles/chat.css";
+@import "./styles/composer.css";
+@import "./styles/auth.css";
+@import "./styles/admin.css";
+@import "./styles/ask-card.css";
+@import "./styles/markdown.css";
+@import "./styles/code.css";
+@import "./styles/trace.css";
+@import "./styles/gallery.css";
+@import "./styles/responsive.css";
 /* Layout + components on top of theme.css tokens */
 
 * { box-sizing: border-box; margin: 0; }

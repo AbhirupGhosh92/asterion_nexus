@@ -9,8 +9,22 @@ views/        View       Components. Render props, call callbacks, no fetching.
 App.tsx       —          Root: picks a screen from auth state.
 main.tsx      —          Mount point + stylesheet imports.
 theme.css     —          Design tokens (colors, fonts, glows). Re-theme here.
-app.css       —          Layout and component styles.
+app.css       —          Manifest: @imports styles/ in cascade order.
+styles/       —          One stylesheet per feature area.
 ```
+
+## Styles
+
+`app.css` holds no rules — it imports `styles/*.css` in cascade order
+(structure → chrome → content → features → `responsive.css` last, since it
+overrides everything above it).
+
+One file per area — `chat.css`, `composer.css`, `code.css`, `gallery.css`,
+`admin.css` and so on. **Adding a feature means a new file plus one import
+line**, not appending to a shared tail: two branches that both appended to
+the end of the old single `app.css` produced a merge conflict whose
+resolution silently deleted an entire feature's styling (PR #19). Separate
+files make those conflicts impossible.
 
 ## The rule that keeps this clean
 
