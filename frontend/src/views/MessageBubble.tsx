@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchUploadUrl } from "../models/api";
 import type { AgentStep, UiMessage } from "../models/types";
+import { useCopy } from "../viewmodels/useCopy";
 import AskCard, { parseAsk } from "./AskCard";
 import Markdown from "./Markdown";
 
@@ -55,27 +56,11 @@ function GeneratedImage({ fileId }: { fileId: string }) {
 
 /** Copy / retry actions shown under a user message. */
 function MessageActions({ text, onRetry }: { text: string; onRetry?: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Clipboard API needs a secure context; fall back to a hidden textarea.
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
-  }
+  const { copied, copy } = useCopy();
 
   return (
     <div className="msg-actions">
-      <button className="msg-action" onClick={copy} title="Copy this message">
+      <button className="msg-action" onClick={() => copy(text)} title="Copy this message">
         {copied ? "✓ copied" : "⧉ copy"}
       </button>
       {onRetry && (

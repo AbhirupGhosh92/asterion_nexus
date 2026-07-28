@@ -1,5 +1,7 @@
+import { isValidElement } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import CodeBlock from "./CodeBlock";
 
 /**
  * Markdown renderer for assistant output — tables, links, code, lists.
@@ -23,18 +25,29 @@ export default function Markdown({ children }: { children: string }) {
               <table {...props} />
             </div>
           ),
-          code: ({ className, children, ...props }) => {
-            const inline = !String(className || "").includes("language-");
-            return inline ? (
-              <code className="md-code-inline" {...props}>
-                {children}
-              </code>
-            ) : (
-              <code className={className} {...props}>
-                {children}
-              </code>
+          // Fenced blocks are handled at the `pre` level, not `code`: react
+          // -markdown no longer passes an `inline` flag, and "is my parent a
+          // pre?" is the only reliable way to tell a block from inline code.
+          // Replacing `pre` outright means the inner `code` never renders,
+          // so the panel owns the whole block.
+          pre: ({ children }) => {
+            const el = isValidElement<{ className?: string; children?: unknown }>(children)
+              ? children
+              : null;
+            return (
+              <CodeBlock
+                className={el?.props.className}
+                // Markdown fences always end in a newline the author didn't
+                // type; keeping it would add a blank line to every copy.
+                code={String(el?.props.children ?? "").replace(/\n$/, "")}
+              />
             );
           },
+          code: ({ className, children, ...props }) => (
+            <code className={className ? className : "md-code-inline"} {...props}>
+              {children}
+            </code>
+          ),
         }}
       >
         {children}

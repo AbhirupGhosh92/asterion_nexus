@@ -209,6 +209,10 @@ html, body, #root { height: 100%; }
 
 .msg-body {
   display: inline-block;
+  /* inline-block is shrink-to-fit, i.e. sized to max-content — without this
+     a long code line widens the bubble past the viewport instead of
+     scrolling inside its panel. */
+  max-width: 100%;
   text-align: left;
   padding: 10px 14px;
   border-radius: 6px;
@@ -768,16 +772,61 @@ html, body, #root { height: 100%; }
   color: var(--neon-cyan);
 }
 
-.md pre {
+/* --- Code panels: language label, copy button, highlighted body --- */
+.code-panel {
   margin: 0 0 0.7em;
-  padding: 10px 12px;
+  max-width: 100%;
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
   background: var(--bg-void);
+  overflow: hidden; /* keep the body's scrollbar inside the rounded corners */
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px 5px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  opacity: 0.75;
+}
+
+.code-copy {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 3px 9px;
+  border-radius: 999px;
   border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  /* Always visible: a code panel is often the whole reason for the message,
+     and hover-only controls are unreachable on touch. */
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.code-copy:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+
+.code-body {
+  margin: 0;
+  padding: 10px 12px;
   overflow-x: auto;
 }
 
-.md pre code {
+/* No bare `.md pre` rule: Markdown replaces `pre` with the code panel, so
+   one would only fight .code-body (and win, on specificity). */
+.code-body code {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.5;
@@ -1121,3 +1170,49 @@ html, body, #root { height: 100%; }
   .msg-actions { opacity: 1; }
   .img-download { opacity: 0.85; }
 }
+
+/* --- Syntax highlighting (highlight.js classes, cyberpunk palette) ---
+   Hand-mapped instead of importing an hljs theme so code sits in the same
+   four-colour system as the rest of the UI and ships no extra CSS. */
+.hljs-comment,
+.hljs-quote { color: var(--text-dim); font-style: italic; opacity: 0.8; }
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name,
+.hljs-tag { color: var(--neon-magenta); }
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition { color: var(--neon-lime); }
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta { color: var(--neon-amber); }
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-built_in { color: var(--neon-cyan); }
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-template-variable { color: #7fd4ff; }
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ { color: #ffd98a; }
+
+.hljs-params,
+.hljs-punctuation,
+.hljs-operator { color: var(--text-primary); }
+
+.hljs-deletion { color: var(--neon-magenta); opacity: 0.85; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+.hljs-link { text-decoration: underline; }

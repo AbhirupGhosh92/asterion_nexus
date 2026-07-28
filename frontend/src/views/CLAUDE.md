@@ -10,7 +10,9 @@ state like "is this panel open" is fine).
 | `Sidebar.tsx` | Conversation topics list. Fully driven by props. |
 | `MessageBubble.tsx` | One message: attachments, decision trace, markdown/plain content, generated images, the ask-card, plus copy/retry actions (user messages) and image download. |
 | `Composer.tsx` | Model picker, attachment chips, input and TRANSMIT. |
-| `Markdown.tsx` | Assistant markdown → HTML. Raw HTML deliberately **not** enabled; links forced to `target=_blank rel=noopener`. |
+| `Markdown.tsx` | Assistant markdown → HTML. Raw HTML deliberately **not** enabled; links forced to `target=_blank rel=noopener`. Fenced blocks are replaced at the `pre` level. |
+| `CodeBlock.tsx` | A code panel: language label, copy button, syntax-highlighted body. Runs lowlight itself. |
+| `languages.ts` | The highlighting language set — deliberately curated, see below. |
 | `AskCard.tsx` | Parses ```ask blocks into clickable option buttons. |
 | `admin/` | The admin panel — see `admin/CLAUDE.md`. |
 
@@ -23,6 +25,18 @@ state like "is this panel open" is fine).
 - `.md` opts out of the bubble's `white-space: pre-wrap`, or every markdown
   paragraph double-spaces.
 
+- **Code blocks are intercepted at `pre`, not `code`.** react-markdown no
+  longer passes an `inline` flag, so "is my parent a `pre`?" is the only
+  reliable block-vs-inline test. Replacing `pre` means the inner `code`
+  component never renders for fenced blocks.
+- Highlighting runs inside `CodeBlock` via lowlight rather than through
+  `rehype-highlight`, which statically imports highlight.js's ~37-language
+  `common` set (+53 kB gzip on the critical path — every message renders
+  through `Markdown`) with no option to opt out. Add a language in
+  `languages.ts`; unregistered ones render as plain text, never throw.
+- The `hljs-*` colours live in `app.css` on the theme tokens, so no hljs
+  stylesheet ships. `.md pre` must stay unstyled: it would match
+  `.code-body` and beat it on specificity.
 - Copy/retry appear on **user** messages only; retry is hidden while a turn is
   streaming. Copy falls back to a hidden textarea when the Clipboard API is
   unavailable (it needs a secure context).
