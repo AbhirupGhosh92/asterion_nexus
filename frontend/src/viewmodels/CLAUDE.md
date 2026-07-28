@@ -9,6 +9,7 @@ contain no JSX.
 | `useChat.ts` | The live conversation: message list, streaming, model choice, attachments/upload, quota-aware error text, scroll pinning, and `retry`. The busiest file in the UI. |
 | `useConversations.ts` | The topics sidebar: list, open, delete, active id. |
 | `useCopy.ts` | Copy-to-clipboard plus a transient "copied" flag, with the insecure-context fallback in one place. Used by message actions and code panels. |
+| `useAgents.ts` | The specialist roster for the homepage gallery. Takes the caller's tier so the list re-fetches when it changes — `locked` is computed server-side. |
 
 ## Scroll behaviour (useChat)
 

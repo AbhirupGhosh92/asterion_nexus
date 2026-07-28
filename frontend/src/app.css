@@ -252,6 +252,9 @@ html, body, #root { height: 100%; }
 
 .composer-input {
   flex: 1;
+  /* Inputs have a min-content width of ~20 characters; without this the
+     composer row can't shrink and overflows narrow screens sideways. */
+  min-width: 0;
   background: var(--bg-panel);
   border: 1px solid var(--border-dim);
   border-radius: 6px;
@@ -1109,6 +1112,11 @@ html, body, #root { height: 100%; }
   .msg { max-width: 94%; }
   .gate-panel { padding: 32px 22px; margin: 0 12px; }
   .composer-send { padding: 0 14px; font-size: 0.62rem; }
+  /* Agent labels ("⚡ Strategist Prime") are long. Rather than squeeze the
+     input to a few characters, give the picker its own row on narrow
+     screens. */
+  .composer { flex-wrap: wrap; }
+  .model-select { flex: 1 0 100%; max-width: none; padding: 6px 8px; }
   .composer-input { font-size: 16px; }   /* prevents iOS zoom-on-focus */
 }
 

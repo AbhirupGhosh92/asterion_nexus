@@ -14,6 +14,8 @@ state like "is this panel open" is fine).
 | `CodeBlock.tsx` | A code panel: language label, copy button, syntax-highlighted body. Runs lowlight itself. |
 | `languages.ts` | The highlighting language set — deliberately curated, see below. |
 | `AskCard.tsx` | Parses ```ask blocks into clickable option buttons. |
+| `AgentGallery.tsx` | The homepage roster of specialist agents. Locked cards route to the upgrade dialog; unlocked ones set the composer's model. |
+| `UpgradeDialog.tsx` | The Pro placeholder: plan comparison with a deliberately inert CTA — there's no billing integration yet. |
 | `admin/` | The admin panel — see `admin/CLAUDE.md`. |
 
 ## Gotchas
@@ -37,6 +39,9 @@ state like "is this panel open" is fine).
 - The `hljs-*` colours live in `app.css` on the theme tokens, so no hljs
   stylesheet ships. `.md pre` must stay unstyled: it would match
   `.code-body` and beat it on specificity.
+- The gallery only renders on an empty conversation (the homepage), and a
+  locked card is a *display* state — the server enforces the same rule, so
+  the dialog is UX, not security.
 - Copy/retry appear on **user** messages only; retry is hidden while a turn is
   streaming. Copy falls back to a hidden textarea when the Clipboard API is
   unavailable (it needs a secure context).

@@ -63,6 +63,21 @@ export interface AdminModel {
   extra: Record<string, string>;
 }
 
+/**
+ * A specialist agent as the homepage gallery sees it. `locked` means the
+ * caller's tier is below `min_tier` — the card is shown anyway, gated behind
+ * the upgrade dialog; the backend enforces the same rule for real.
+ */
+export interface SpecialistAgent {
+  id: string;
+  label: string;
+  description: string;
+  tools: string[];
+  min_tier: string;
+  locked: boolean;
+  online: boolean;
+}
+
 export interface EngineStatus {
   mode: "docker" | "vm" | "external" | "none";
   configured: boolean;

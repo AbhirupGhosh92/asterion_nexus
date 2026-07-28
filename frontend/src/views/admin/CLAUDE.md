@@ -9,7 +9,7 @@ tab is an independent screen taking a single `onError` prop and calling
 | `UsersTab.tsx` | Firebase users: tier, lock/unlock, per-user quota override and usage reset. |
 | `QuotasTab.tsx` | Global monthly limits per tier + the enforcement on/off switch. |
 | `ModelsTab.tsx` | The model registry — add/remove models from any provider, set min tier, toggle online. |
-| `AgentsTab.tsx` | Agent Forge: create Dify agents with instructions + a tool loadout (built-ins and MCP tools). |
+| `AgentsTab.tsx` | Agent Forge: create Dify agents with instructions + a tool loadout (built-ins and MCP tools). Min tier offers pro/admin only — the backend floors agents at Pro, so a "free" option would be a lying control. |
 | `McpTab.tsx` | Link MCP servers by URL; discovered tools join the forge arsenal automatically. |
 | `EngineTab.tsx` | Dify engine health and START/STOP/RESTART — local docker compose or the Compute Engine VM. |
 
