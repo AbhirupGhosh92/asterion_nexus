@@ -1,9 +1,10 @@
 # NEXUS AI Platform — Claude Code guide
 
 Personal ChatGPT-class AI platform: cyberpunk React UI + FastAPI backend +
-NeMo Guardrails + Vertex AI (Gemini chat & image) + Dify agents + MCP tools.
-Serverless in prod. Read `docs/DESIGN.md` for architecture rationale,
-`docs/DEVELOPER_GUIDE.md` for a file-by-file walkthrough.
+NeMo Guardrails + Vertex AI (Gemini chat & image) + LangGraph deep agents
+(with Dify as an optional second runtime) + MCP tools. Serverless in prod.
+Read `docs/DESIGN.md` for architecture rationale, `docs/DEVELOPER_GUIDE.md`
+for a layer-by-layer walkthrough.
 
 Deployment-specific facts (project ids, accounts, URLs) live in
 `CLAUDE.local.md` (gitignored) and `deploy.config` — read those first if
@@ -41,13 +42,14 @@ backend/CLAUDE.md            layering + invariants      (start here for API work
   routers/     View          HTTP only
   services/    ViewModel     orchestration (chat_service is the big one)
   repositories/ Model        Firestore / Storage / Memory Bank
-  providers/   Model         LLMs, Dify, guardrail adapters
+  providers/   Model         LLMs, deep agents + tools, Dify, guardrail adapters
   models/ core/              schemas, config, auth
 
 frontend/src/CLAUDE.md       layering + the no-fetch-in-views rule
   models/      Model         types + API client
-  viewmodels/  ViewModel     hooks: useChat, useAuth, useConversations
+  viewmodels/  ViewModel     hooks: useChat, useAuth, useConversations, useAgents
   views/       View          components (views/admin/ = control plane)
+  styles/      —             one stylesheet per feature; app.css only @imports
 ```
 
 Dependencies point one way: `routers → services → repositories/providers →
@@ -75,8 +77,10 @@ cd backend && .venv/bin/python -c "import app"
 1. Every uid used for data scoping comes from the **verified Firebase token**
    (`core/auth.verify_firebase_token`), never from request bodies.
 2. All LLM traffic passes NeMo Guardrails. Text turns: full rails. Multimodal
-   / Dify / image turns: staged rails via `options={"rails": ["input"|"output"]}`
-   (NeMo drops media parts, hence the hybrid path in `services/chat_service._guarded_multimodal`).
+   / agent (deep + Dify) / image turns: staged rails via
+   `options={"rails": ["input"|"output"]}` (NeMo drops media parts, hence the
+   hybrid path in `services/chat_service._guarded_multimodal`). Agent answers
+   stay buffered until the output rails pass — steps may stream, answers may not.
 3. Admin surface (`/api/admin/*`) is gated by `ADMIN_EMAILS` (.env), an
    identity allowlist — tiers do NOT grant admin.
 4. Clients never talk to Firestore/Storage/Dify directly — everything goes
@@ -104,7 +108,20 @@ cd backend && .venv/bin/python -c "import app"
   running the backend WITHOUT the test email in the allowlist.
 - `registry.get_rails(None, …)` defaults to the `default` model id and never
   auto-picks an agent/image model; `dify.is_up()` (60 s cached probe) hides
-  agents when the engine is unreachable.
+  Dify agents when the engine is unreachable. Deep agents are always online —
+  they run in this process.
+- `chat_service.stream()` must resolve the model **before** returning the SSE
+  generator. Resolve inside it and `StreamingResponse` has already sent 200
+  headers, so a 403 can only truncate the body — the client sees an empty
+  success with no explanation.
+- `build_chat_llm(..., model=)` takes the model explicitly. Selecting one by
+  mutating `os.environ["VERTEX_MODEL"]` leaks it into the next model built.
+- Specialist agents are floored at the `pro` tier by `effective_min_tier`,
+  which feeds both `list_for_tier` and the gallery's `locked` flag — one rule,
+  two consumers, so the badge can't disagree with the gate.
+- `frontend/src/app.css` is a manifest of `@import`s only. Style a feature in
+  its own `styles/*.css`; appending to a shared tail is how a merge once
+  silently deleted an entire feature's styling.
 
 ## E2E testing recipe (no user password ever)
 

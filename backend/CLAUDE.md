@@ -7,7 +7,7 @@ CLAUDE.md with a per-file map.**
 routers/       View       HTTP in/out. No decisions, no business logic.
 services/      ViewModel  Orchestration — what actually happens per request.
 repositories/  Model      Data access: Firestore, Cloud Storage, Memory Bank.
-providers/     Model      LLMs, Dify, and the guardrail adapters.
+providers/     Model      LLMs, deep agents + their tools, Dify, guardrail adapters.
 models/        Model      Pydantic schemas shared across layers.
 core/          —          Config + auth, used by every layer.
 guardrails/    —          NeMo config (YAML/Colang, no Python).
@@ -35,6 +35,8 @@ time in `app.py` rather than importing across.
 | Change what a chat turn does | `services/chat_service.py` |
 | Change persistence shape | `repositories/` |
 | Add an LLM provider | `providers/llm.py` |
+| Add a deep-agent tool | `providers/agent_tools.py` (`@tool` + `TOOL_CATALOG`) |
+| Change agent execution | `providers/deep_agents.py` (LangGraph) or `providers/dify.py` |
 | Change safety policy | `guardrails/config.yml` (plain English, no code) |
 | Add an env var | `core/config.py` (declare it there, not inline `os.getenv`) |
 

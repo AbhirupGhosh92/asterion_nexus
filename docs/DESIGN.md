@@ -2,9 +2,14 @@
 
 A production-grade, cost-optimized personal AI platform (ChatGPT-class, fully
 customizable) built by and for a single developer. Custom cyberpunk UI on
-Firebase Hosting, scale-to-zero FastAPI backend on GCP Cloud Run, Dify for
-visual orchestration, NeMo Guardrails for governance, and a local Ollama path
-so development costs nothing.
+Firebase Hosting, scale-to-zero FastAPI backend on GCP Cloud Run, LangGraph
+deep agents in-process (with Dify as an optional visual-orchestration
+engine), NeMo Guardrails for governance, and a local Ollama path so
+development costs nothing.
+
+Both halves of the codebase are MVVM-layered; every layer carries its own
+`CLAUDE.md` map. This document explains *why* the architecture is this way —
+`DEVELOPER_GUIDE.md` explains *what* and *how*.
 
 ---
 
@@ -13,7 +18,7 @@ so development costs nothing.
 ```mermaid
 flowchart TB
     subgraph CLIENT["Client — Firebase Hosting"]
-        UI["Cyberpunk UI<br/>(React + Vite + Tailwind)"]
+        UI["Cyberpunk UI<br/>(React + Vite + TypeScript, MVVM)"]
         FBA["Firebase Auth SDK<br/>(ID token, custom claims)"]
         UI --> FBA
     end
@@ -31,9 +36,12 @@ flowchart TB
         AUTH --> GRIN --> API --> GROUT
     end
 
-    subgraph ORCH["Orchestration Layer"]
-        DIFY["Dify<br/>visual workflows · RAG · 50+ tools"]
-        MCP["MCP Servers<br/>Google Docs · Reddit · Image Gen"]
+    subgraph ORCH["Agent Runtimes"]
+        DEEP["LangGraph deep agents<br/>in-process · planner + tools + sub-agents"]
+        TOOLS["Python tools<br/>search · wikipedia · fetch · time · calc"]
+        DIFY["Dify (optional)<br/>visual workflows · RAG · plugin marketplace"]
+        MCP["MCP Servers<br/>Google Docs · Reddit · DeepWiki"]
+        DEEP --> TOOLS
         DIFY --> MCP
     end
 
@@ -46,6 +54,7 @@ flowchart TB
     SM["Secret Manager"]
 
     UI -- "fetch /api/* + Bearer ID token" --> RW --> AUTH
+    API -- "same rails contract" --> DEEP
     API -- "identity-propagated call<br/>X-Acting-User-Id / Tier" --> DIFY
     API --> VERTEX
     API -.->|"LLM_PROVIDER=ollama"| OLLAMA
@@ -91,27 +100,32 @@ the propagated headers authorize the *user*.
 
 ## 2. Repository Layout
 
+Both halves are **MVVM-layered**, and each layer carries a `CLAUDE.md` with a
+per-file map — those stay current with the code, this tree shows the shape.
+
 ```
 ai_platform/
-├── infra/main.tf              # Terraform: Artifact Registry, secrets, Cloud Run
-├── backend/
-│   ├── app.py        # entry point: routes, guardrails wiring, memory
-│   ├── auth.py                # Firebase token verify + RBAC tiers
-│   ├── providers.py           # vertexai | ollama | mock switch (one env var)
-│   ├── memory.py              # Vertex AI Memory Bank wrapper (no-op offline)
-│   ├── store.py               # Firestore: user profiles + chat history topics
-│   ├── models_registry.py     # admin-managed LLM catalog (Firestore) + rails cache
-│   ├── admin.py               # /api/admin/*: users (tier/lock) + model registry
-│   ├── uploads.py             # media uploads → Firebase Storage (server-side)
-│   ├── guardrails/            # NeMo config.yml + rails.co
+├── infra/main.tf              # Terraform: Artifact Registry, secrets, Cloud Run, optional Dify VM
+├── backend/                   # routers → services → repositories/providers → models/core
+│   ├── app.py                 # composition root: object graph + router mounts
+│   ├── routers/               # View: chat, conversations, uploads, agents, admin (HTTP only)
+│   ├── services/              # ViewModel: chat_service, registry_service, quota_service, engine_service
+│   ├── repositories/          # Model: chat_repo (Firestore), media_repo (Storage), memory_repo (Memory Bank)
+│   ├── providers/             # Model: llm, deep_agents, agent_tools, dify, image_rails
+│   ├── models/  core/         # Pydantic schemas · config + auth (token verify, tiers, ADMIN_EMAILS)
+│   ├── guardrails/            # NeMo config.yml + rails.co (no Python)
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
 │   ├── firebase.json          # Hosting rewrite /api/** → Cloud Run
-│   └── src/
-│       ├── lib/apiClient.ts   # authed fetch + SSE streaming bridge
+│   └── src/                   # views → viewmodels → models
+│       ├── models/            # types.ts + api.ts (the only backend caller)
+│       ├── viewmodels/        # useChat, useAuth, useConversations, useAgents, useCopy
+│       ├── views/             # Workspace, MessageBubble, CodeBlock, AgentGallery, admin/
+│       ├── styles/            # one stylesheet per feature area
+│       ├── app.css            # manifest: @imports styles/ in cascade order
 │       └── theme.css          # cyberpunk design tokens
-└── docs/DESIGN.md
+└── docs/DESIGN.md · DEVELOPER_GUIDE.md
 ```
 
 ---
@@ -120,7 +134,8 @@ ai_platform/
 
 | Concern | Choice | Why (for a solo dev) |
 |---|---|---|
-| Orchestration | **Dify** (self-hosted or cloud) | Visual workflows + RAG + 50+ built-in tools + monitoring in one place; the alternative (AgentScope) is code-first and better suited for later, custom agent logic |
+| Agents (default) | **LangGraph + `deepagents`**, in-process | Planner, tool loop and sub-agents with no second system to deploy, keep alive or pay for; tools are ordinary Python you can unit-test. Scale-to-zero applies to agents too |
+| Agents (alt) | **Dify** (self-hosted) | Visual workflows + RAG + marketplace plugins + monitoring when you want an ops console rather than code; needs an always-on VM |
 | Modularity | **MCP servers** | Add Google Docs / Reddit / image-gen as independent processes; Dify ≥ v1.6 consumes MCP tools directly, so no glue code |
 | Guardrails | **NeMo Guardrails** (Python package, in-process) | Runs inside the same container — no sidecar to pay for; rails are YAML/Colang config, not code |
 | Prod LLM | **Vertex AI Gemini** (`gemini-2.5-flash`) | Same GCP project → one bill, IAM-native, no API key handling |
@@ -129,16 +144,28 @@ ai_platform/
 | History | **Firestore `(default)` DB** | ChatGPT-style topics: `users/{uid}/conversations/{cid}/messages`; free tier applies only to the `(default)` database; all access server-side via Admin SDK (verified-uid scoping = the access rule), LLM auto-titles each new conversation |
 | Identity | **Firebase Auth** + custom claims | Free tier, SDK handles refresh, claims ride in the signed token |
 
-### Dify vs AgentScope — the pragmatic split
+### LangGraph vs Dify — the pragmatic split
 
-- **Start with Dify** for all workflow/RAG/tool logic. It covers modular
-  components and much of the operational governance (logs, annotations,
-  moderation hooks) with near-zero code.
-- **Adopt AgentScope later** only if you need programmatic multi-agent
-  patterns Dify can't express. Its `examples/web_ui` template is still a good
-  quarry for chat-UI patterns (streaming rendering, session lists) — port the
-  patterns into your own cyberpunk UI rather than adopting the template
-  wholesale, since you want a fully custom look.
+The platform runs **both**, because they answer different questions.
+
+- **LangGraph deep agents are the default.** The original bet was that a
+  visual console beats writing agent code. In practice the console became the
+  expensive part: Dify needs Postgres and Redis, so "add an agent" implied a
+  ~$25–50/mo VM, an engine to keep reachable, and agents that exist in *one*
+  engine (agents forged locally don't exist in the cloud, and vice versa). A
+  deep agent is a Firestore document compiled into a graph at first use —
+  nothing to provision, nothing to fail, and it deploys with the backend.
+- **Dify stays** for what it is genuinely better at: a marketplace of
+  installable tools, MCP hosting, and an ops console with logs and
+  annotations. When it's down, only its own agents disappear.
+- **Neither leaks upward.** Both expose the same duck-typed rails contract
+  (`generate_async` / `stream_async`), so `chat_service` is unaware of which
+  is running, and `AGENT_PROVIDERS` in the registry is the single place that
+  enumerates agent runtimes. Adding a third is one entry plus one branch.
+
+AgentScope remains unadopted: LangGraph covers the programmatic multi-agent
+patterns it was being held in reserve for, and it's already in the dependency
+tree via LangChain.
 
 ### MCP integration path
 
@@ -209,11 +236,49 @@ type-allowlisted). Clients never touch Storage directly: upload, list, and
 content routes all go through FastAPI with verified-uid scoping, and
 attachment ids in chat resolve only against the requesting user's own files.
 
+### 5.1e-0 LangGraph deep agents — the default runtime
+
+A deep agent is a LangGraph graph built from a Firestore spec at first use
+(`providers/deep_agents.py`, `deepagents` package): planner, tool loop,
+optional sub-agents, running inside the Cloud Run container. There is nothing
+to provision — creating one writes a registry entry with
+`provider: "langgraph"` and it is immediately live, everywhere the backend
+is.
+
+Runtime path is identical in shape to Dify's, which is the point: NeMo INPUT
+rails screen the text → the graph runs → OUTPUT rails screen the answer.
+`DeepAgentRails` exposes the same duck-typed contract as `DifyRails`, so
+`chat_service` never learns which runtime answered.
+
+Two details that shape the implementation:
+
+- **Steps are assembled from two events.** LangGraph emits a tool call and
+  its result as separate updates, so calls are held by `tool_call_id` until
+  the matching `ToolMessage` arrives — that pairing is what produces one
+  complete entry in the UI's decision trace. A call that never returns still
+  gets an entry marked `(no result)`, so the trace can't silently lose a step.
+- **Steps stream, the answer doesn't.** Decisions surface live; the answer is
+  buffered until the output rails pass. Emitting it as it generates would
+  mean a rails rejection arrives after the user has already read the text —
+  and a token that has been sent cannot be recalled.
+
+**Tools** (`providers/agent_tools.py`) are plain Python — `current_time`,
+`web_search`, `wikipedia`, `fetch_url`, `calculator` — stdlib and httpx only,
+each returning a string and never raising: an error the model can read lets
+it recover, while a traceback kills the turn. `calculator` walks an AST
+restricted to numeric literals and arithmetic operators, with no names, calls
+or attribute access, so it is not a route to the interpreter. Adding a tool
+is one `@tool` function plus a `TOOL_CATALOG` entry; the admin forge picks it
+up automatically.
+
+`RECURSION_LIMIT` bounds the loop — a deep agent needs room to plan and
+retry, but every step is a model call the user pays for.
+
 ### 5.1e Dify agents — NEXUS as the control plane
 
 Dify runs self-hosted (Docker, `infra/dify/docker`, port 8090) purely as the
 orchestration **engine**; agents are built and controlled from the NEXUS UI
-(admin → AGENT FORGE), never from Dify's console. `backend/dify.py` drives
+(admin → AGENT FORGE), never from Dify's console. `backend/providers/dify.py` drives
 Dify's Console API (cookie+CSRF auth; the password field is base64-encoded)
 to create agent-chat apps, set their system prompt/model, and mint per-app
 Service API keys, which are stored in the model registry with
@@ -228,7 +293,7 @@ key in `infra/dify-vertex-sa.json`, gitignored) via the `vertex_ai` plugin.
 Dify admin credentials live in `backend/.env` (DIFY_ADMIN_*).
 
 **Agent tools:** the forge's ARSENAL row equips agents from a curated
-catalog (`TOOL_CATALOG` in `backend/dify.py`): Web Search (DuckDuckGo),
+catalog (`TOOL_CATALOG` in `backend/providers/dify.py`): Web Search (DuckDuckGo),
 Wikipedia, Web Scraper, Current Time — all credential-free. Dify runs the
 function-call loop (max 5 iterations). Adding a tool = installing its Dify
 plugin (Console API, marketplace identifier) + one `TOOL_CATALOG` entry.
@@ -261,7 +326,7 @@ Ops: `docker compose -f infra/dify/docker/docker-compose.yaml up -d|down`.
 ### 5.1f Image generation
 
 Vertex's image model is rate-limited to a few requests per minute, and a 429
-looks nothing like a bad prompt — so `imagegen.py` retries 429s with
+looks nothing like a bad prompt — so `providers/image_rails.py` retries 429s with
 exponential backoff (4 attempts: 5s/10s/20s) and reports an accurate reason
 when it finally gives up. It also sends the last few conversation turns as
 `contents` (image tokens stripped) so follow-ups like "make it blue instead"
@@ -269,7 +334,7 @@ resolve, and treats a text-only reply as a message to show rather than an
 error — the model is conversational and sometimes answers instead of drawing.
 
 "🎨 Image Studio" is a registry model with provider `vertexai_image`
-(`backend/imagegen.py`): the prompt passes INPUT rails, then
+(`backend/providers/image_rails.py`): the prompt passes INPUT rails, then
 `gemini-2.5-flash-image` generates via the google-genai SDK (classic Imagen
 publisher models were removed from Vertex in June 2026 — Gemini image models
 are the only path), the PNG is stored in Firebase Storage under the
@@ -281,7 +346,7 @@ failure message.
 
 ### 5.1g Monthly API quotas
 
-`backend/quota.py` caps how many model-calling requests each user may make
+`backend/services/quota_service.py` caps how many model-calling requests each user may make
 per calendar month — the cost-control counterpart to RBAC.
 
 - **Limits** are per tier (default `free: 5`, `pro: 100`, `admin: -1` =
@@ -313,6 +378,30 @@ drops arbitrary system messages, so a system-message version looks correct
 but never reaches the model. Raw-LLM paths (multimodal) pass `ASK_PROTOCOL`
 directly instead. Malformed or partial blocks fall back to plain text, so a
 half-streamed block never shows raw JSON.
+
+### 5.1i Specialist gallery and the Pro tier
+
+Forged agents surface as cards on the homepage (`views/AgentGallery.tsx`),
+each showing its briefing, tool loadout and runtime badge. Agents above the
+caller's tier are **shown, not hidden** — the section's job is to advertise
+what Pro unlocks — and clicking one opens the upgrade dialog instead of the
+composer.
+
+The gate that matters is server-side. `effective_min_tier` in the registry
+raises any agent provider to at least `pro`, and the *same* function feeds
+both `list_for_tier` (what the composer offers, and what `get_rails` will
+permit) and the gallery's `locked` flag. One rule, two consumers: the badge
+cannot disagree with the gate, and forging `locked: false` in the client buys
+nothing because the stream endpoint 403s independently.
+
+That 403 is only a real status code because `chat_service.stream()` resolves
+the model *before* returning the SSE generator. Resolving inside the
+generator means `StreamingResponse` has already sent 200 headers, and the
+exception can then only truncate the body — the caller sees an empty success.
+
+Billing is deliberately absent: `UpgradeDialog` states that plainly rather
+than dead-ending on a broken checkout. The gating it advertises already
+works, so wiring a provider is checkout → webhook → set the `tier` claim.
 
 ### 5.2 RBAC — user tiers
 
@@ -381,8 +470,12 @@ tools. Rules:
 
 ## 6. Frontend — Cyberpunk UI
 
-- **Stack:** React 18 + Vite + Tailwind + pnpm → static `dist/` →
-  `firebase deploy --only hosting`.
+- **Stack:** React 18 + Vite + TypeScript → static `dist/` →
+  `firebase deploy --only hosting`. Layered MVVM (`models` → `viewmodels` →
+  `views`) with one rule doing the work: **views never fetch and never hold
+  business state**, so a `fetch(` in `views/` is a layering bug you can grep
+  for. `views/admin/*` is the deliberate exception — each tab is a small CRUD
+  screen where a per-tab hook would be ceremony.
 - **Design tokens** in `frontend/src/theme.css`: deep-void surfaces
   (`#07070f`), one primary neon (cyan `#00f0ff`), one hot accent (magenta
   `#ff2ea6`), scanline overlay, glow shadows, Orbitron/JetBrains Mono type.
@@ -393,9 +486,23 @@ tools. Rules:
   tokens, `thinking-indicator` pulse while the model streams, glitch-hover
   nav, HUD-style tier badge (from `/api/me`), a "guardrail tripped" alert in
   amber when `guardrail_triggered` is true.
-- **Auth flow:** Firebase Auth UI (Google sign-in) → `apiClient.ts` attaches
+- **Auth flow:** Firebase Auth UI (Google sign-in) → `models/api.ts` attaches
   auto-refreshed ID tokens to every call; SSE streaming works through the
   Hosting rewrite.
+- **Stylesheets are split per feature area** (`styles/*.css`), with `app.css`
+  as a manifest of `@import`s whose order *is* the cascade (structure →
+  chrome → content → features → responsive last). This is not tidiness: when
+  every feature appended to one 1500-line file, two branches adding UI
+  collided at the same tail every time, and one such merge resolution
+  silently deleted an entire feature's styling while leaving its components
+  compiling and rendering. Separate files make that conflict impossible.
+- **Code blocks** render as panels (language label, copy, highlighting) with
+  highlighting driven by lowlight over a curated language set. The plugin
+  route (`rehype-highlight`) statically imports ~37 languages — +53 kB gzip
+  on the critical path, since every message renders through `Markdown`, with
+  no option to opt out. Blocks are intercepted at `pre`, because
+  react-markdown no longer passes an `inline` flag and parentage is the only
+  reliable block-vs-inline test.
 
 ---
 
@@ -407,13 +514,13 @@ ollama pull llama3.1:8b && ollama serve
 
 # 2. Backend (guardrails + memory no-op, auth disabled)
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv venv --python 3.12 .venv          # 3.12: newer Pythons break deps
+uv pip install --python .venv/bin/python -r requirements.txt
 cp .env.example .env
 LLM_PROVIDER=ollama AUTH_DISABLED=1 uvicorn app:app --reload --port 8080
 
 # 3. Frontend
-cd frontend && pnpm install && pnpm dev   # hits localhost:8080 directly in dev
+cd frontend && npm install && npm run dev   # Vite proxies /api → :8080
 ```
 
 Everything — including the guardrails — runs against the local model, so you
@@ -451,11 +558,12 @@ gcloud builds submit -t us-central1-docker.pkg.dev/YOUR_PROJECT/ai-platform/back
 terraform -chdir=../infra apply -var="project_id=YOUR_PROJECT"   # rolls new tag
 
 # Ship the frontend
-cd frontend && pnpm build && firebase deploy --only hosting
+cd frontend && npm run build && firebase deploy --only hosting
 ```
 
-CI later: a single GitHub Action doing build→push→`gcloud run deploy` +
-`firebase deploy` on main. Keep it that simple.
+In practice all of this is wrapped by `./deploy.sh` (driven by
+`deploy.config`), and `.github/workflows/ci.yml` runs the `ci` check — a
+frontend build plus a backend import — as a required check on `main`.
 
 ---
 
@@ -464,21 +572,30 @@ CI later: a single GitHub Action doing build→push→`gcloud run deploy` +
 **Phase 1 — Walking skeleton (now):** local Ollama chat with guardrails →
 deploy → Firebase-authed chat in prod. *Milestone: guarded chat end-to-end.*
 
-**Phase 2 — Orchestration:** stand up Dify, build 2–3 workflows (research
-w/ web search, content-creation pipeline, RAG over your docs), wire
-`/api/workflows/*`. *Milestone: visual workflow callable from your UI.*
+**Phase 2 — Orchestration (done):** Dify stood up and driven from the NEXUS
+admin panel, then joined by in-process **LangGraph deep agents**, now the
+default runtime. *Milestone met: agents forged from the UI on either engine,
+with their decisions visible as a trace.*
 
-**Phase 3 — Modularity:** add MCP servers (Google Docs, Reddit, image gen)
-registered in Dify; per-user OAuth for user-owned data. *Milestone: tools act
-with the user's own permissions.*
+**Phase 3 — Modularity (partly done):** MCP servers register through the
+admin panel and their tools join the Dify arsenal automatically. Still open:
+MCP tools for deep agents (`langchain-mcp-adapters`) and per-user OAuth so
+tools act with the user's own permissions rather than the platform's.
 
 **Phase 4 — Governance depth:** shared knowledge bases with ReBAC tuples +
 retrieval filtering, aggregate output rails (mosaic defense), audit log,
 tier-based model routing (free→flash, pro→pro-class models).
 
-**Phase 5 — Polish & ops:** streaming everywhere, conversation history UI,
-Cloud Monitoring dashboards + budget alerts, API Gateway hardening,
-evaluation harness for rails (adversarial prompt suite run in CI).
+**Phase 5 — Polish & ops (partly done):** streaming, conversation history,
+message copy/retry, syntax-highlighted code panels and the specialist gallery
+have landed. Still open: Cloud Monitoring dashboards + budget alerts, API
+Gateway hardening, and an evaluation harness for the rails (adversarial
+prompt suite run in CI).
+
+**Phase 6 — Agent depth:** sub-agents and the deep-agent virtual filesystem
+for long research tasks, a LangGraph checkpointer so an agent run survives a
+cold start, and billing behind the Pro tier the upgrade dialog already
+advertises.
 
 ---
 

@@ -14,13 +14,21 @@ Built pair-programming with [Claude Code](https://claude.com/claude-code).
   input rails block jailbreaks *before* the model runs, output rails screen
   responses for leaks.
 - 🗂 **ChatGPT-style topics** — conversations saved per user in Firestore,
-  auto-titled by the LLM.
+  auto-titled by the LLM. Copy or retry any message you sent; retry
+  regenerates the answer in place instead of appending a duplicate turn.
 - 🧠 **Long-term memory** — Vertex AI Memory Bank recalls facts about each
   user across conversations, isolated per identity.
-- ⚡ **Agent Forge** — create AI agents (custom instructions + tools) from
-  the admin panel; powered by [Dify](https://github.com/langgenius/dify).
-  Tools include web search, Wikipedia, web scraping, time — plus **any MCP
-  server** you link by URL.
+- ◈ **Deep agents** — create agents (custom instructions + tools) from the
+  admin panel on either runtime: **LangGraph deep agents** that run inside
+  the backend (planner, tool loop, sub-agents — nothing extra to deploy) or
+  [Dify](https://github.com/langgenius/dify) apps. Tools include web search,
+  Wikipedia, page fetching, arithmetic and time — plus **any MCP server** you
+  link by URL. Every decision an agent makes is shown as an expandable trace.
+- 🎯 **Specialist gallery** — forged agents appear as cards on the homepage.
+  Free users see the full roster and get a Pro upgrade prompt; Pro users
+  deploy one in a click.
+- 🧩 **Readable code answers** — fenced code blocks render as panels with a
+  language label, syntax highlighting and a copy button.
 - 🎨 **Image Studio** — prompt-to-image via Gemini's image model, rendered
   inline, stored privately per user.
 - 📎 **Multimodal input** — upload images/audio/video for Gemini to analyze.
@@ -37,15 +45,21 @@ Built pair-programming with [Claude Code](https://claude.com/claude-code).
 
 ```
 Browser ── Firebase Hosting ──► Cloud Run (FastAPI)
-  React UI     /api/** rewrite      │  Firebase Auth verify → RBAC
-                                    │  NeMo Guardrails (in/out rails)
+  React UI     /api/** rewrite      │  Firebase Auth verify → RBAC + quota
+   (MVVM)                           │  NeMo Guardrails (in/out rails)
+                                    │
+                                    ├─► LangGraph deep agents (in-process:
+                                    │   planner + tools + sub-agents)
                                     ├─► Vertex AI  (Gemini chat + image)
-                                    ├─► Firestore  (history, model registry)
+                                    ├─► Firestore  (history, model + agent registry)
                                     ├─► Storage    (uploads, generated images)
                                     ├─► Memory Bank (per-user long-term memory)
-                                    └─► Dify engine (agents + tools; local
-                                        docker in dev, optional VM in cloud)
+                                    └─► Dify engine (optional second agent
+                                        runtime; docker in dev, VM in cloud)
 ```
+
+Both frontend and backend are **MVVM-layered**, and every layer carries its
+own `CLAUDE.md` map — start there when changing code.
 
 Two rules make it secure: clients only ever talk to the FastAPI backend, and
 every data access is scoped by the uid inside the *verified* Firebase token.
@@ -90,15 +104,20 @@ Dify        http://<vm-ip>                       (if WITH_DIFY=true)
 
 Sign in with Google — the email(s) in `ADMIN_EMAILS` get the ⚙ ADMIN panel.
 
-### Agents in the cloud (optional, the one non-serverless piece)
+### Agents in the cloud
 
-Dify needs always-on Postgres/Redis, so cloud agents require a small VM
-(~$25–50/mo). Set `WITH_DIFY="true"` in `deploy.config` and re-run
-`./deploy.sh` — Terraform creates the VM, and the script boots Dify,
-installs the tool plugins, and wires Gemini access automatically. The Dify
-admin password is generated and stored only in Secret Manager (the deploy
-summary shows how to read it). With `WITH_DIFY="false"`, agent models are
-simply hidden — everything else works.
+**LangGraph deep agents need nothing extra** — they run inside the Cloud Run
+container, so they're serverless like everything else and are the default
+for new agents.
+
+Dify is the optional second runtime. It needs always-on Postgres/Redis, so
+it requires a small VM (~$25–50/mo). Set `WITH_DIFY="true"` in
+`deploy.config` and re-run `./deploy.sh` — Terraform creates the VM, and the
+script boots Dify, installs the tool plugins, and wires Gemini access
+automatically. The Dify admin password is generated and stored only in
+Secret Manager (the deploy summary shows how to read it). With
+`WITH_DIFY="false"`, Dify agents are simply hidden — deep agents and
+everything else keep working.
 
 > ⚠ The bundled Dify VM serves HTTP on a public IP. Restrict the firewall
 > to your own IP (edit `google_compute_firewall.dify_http` in
@@ -112,9 +131,9 @@ To stop paying for it again, tear down **only** the Dify engine:
 ```
 
 Everything serverless (chat, history, users, models, uploads, image
-generation, the admin panel) keeps running untouched at $0 idle. Agent
-models simply disappear from the selector while no engine is reachable.
-Flip `WITH_DIFY="true"` and redeploy whenever you want them back.
+generation, **deep agents**, the admin panel) keeps running untouched at $0
+idle. Only Dify agents disappear from the selector while no engine is
+reachable. Flip `WITH_DIFY="true"` and redeploy whenever you want them back.
 
 ## Local development
 
@@ -139,11 +158,13 @@ placeholder model.
 | Change usage limits | Admin panel → QUOTAS (tiers) or OPERATIVES (per user) |
 | Add a chat model | Admin panel → MODEL GRID (no code) |
 | Add an LLM provider | One branch in `backend/providers/llm.py` |
-| Create an agent | Admin panel → AGENT FORGE (no code) |
-| Add an agent tool | Install the Dify plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py` |
+| Create an agent | Admin panel → AGENT FORGE → pick a runtime (no code) |
+| Add a **deep agent** tool | One `@tool` function + a `TOOL_CATALOG` entry in `backend/providers/agent_tools.py` |
+| Add a **Dify** agent tool | Install the plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py` |
 | Connect an MCP server | Admin panel → MCP LINKS → paste URL (no code) |
 | Tune safety rules | Edit the plain-English prompts in `backend/guardrails/config.yml` |
 | Re-theme the UI | Edit CSS variables in `frontend/src/theme.css` |
+| Style a new feature | A new file in `frontend/src/styles/` + one `@import` in `app.css` |
 
 Full recipes: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
 
@@ -154,7 +175,12 @@ Full recipes: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
 | Cloud Run / Hosting / Auth | $0 | pennies (free tiers are generous) |
 | Firestore `(default)` / Storage | $0 | free tier, then pennies |
 | Vertex AI (Gemini) | $0 | per token / per image |
+| LangGraph deep agents | $0 | just the tokens they spend |
 | Dify VM (only if `WITH_DIFY=true`) | ~$25–50/mo | same |
+
+An agent turn costs more tokens than a chat turn — it plans, calls tools and
+re-reads results — so the monthly quota counts one agent turn as one call
+regardless of how many model round-trips it took.
 
 ## Security notes
 
