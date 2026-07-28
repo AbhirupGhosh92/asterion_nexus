@@ -123,6 +123,13 @@ everything else keep working.
 > to your own IP (edit `google_compute_firewall.dify_http` in
 > `infra/main.tf`) or front it with a load balancer + TLS for serious use.
 
+Once the VM exists, **admin panel → ENGINE** starts, restarts and stops it
+from the UI — that's the switch that pauses its billing, and the panel polls
+until Dify is actually answering rather than reporting OFFLINE mid-boot.
+Cloud Run gets a narrow custom role (`compute.instances.get/start/stop/reset`
+on that one instance) to do it; the buttons stay disabled until the VM is
+deployed.
+
 To stop paying for it again, tear down **only** the Dify engine:
 
 ```bash
@@ -187,6 +194,12 @@ regardless of how many model round-trips it took.
 - No secrets in the repo: runtime config lives in `deploy.config`,
   `backend/.env`, and `frontend/.env.local` — all gitignored (templates
   provided). Cloud secrets live in Secret Manager.
+- **Secret scanning on commit.** A pre-commit hook scans staged changes for
+  key material, provider tokens and credential-shaped values, and blocks
+  files that should never be committed (`.env`, service-account JSON, `.pem`).
+  `./start.sh` enables it; or run `./scripts/install-hooks.sh` once. CI runs
+  the same scan over the whole tree, so `--no-verify` can't slip one past.
+  False positive? Append `pragma: allowlist secret` to the line.
 - Cloud Run is network-open (required by Hosting rewrites) but every route
   verifies a Firebase ID token; unauthenticated calls get 401.
 - Admin is an identity allowlist (`ADMIN_EMAILS`), separate from user tiers.

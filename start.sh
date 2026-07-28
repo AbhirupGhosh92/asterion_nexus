@@ -26,6 +26,15 @@ ok()  { echo "${c_green}✓${c_off} $1"; }
 warn(){ echo "${c_yellow}!${c_off} $1"; }
 
 # ---------------------------------------------------------------------------
+# 0. Git hooks (secret scan on commit)
+# ---------------------------------------------------------------------------
+# Git never installs hooks from a clone, so wire them up here — silently when
+# they're already set, so this costs nothing on every later run.
+if [ "$(git config --get core.hooksPath || true)" != ".githooks" ]; then
+  ./scripts/install-hooks.sh >/dev/null 2>&1 && ok "Enabled git hooks (secret scan on commit)"
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Docker (OrbStack) + Dify stack
 # ---------------------------------------------------------------------------
 say "Checking Docker (OrbStack)…"

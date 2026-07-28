@@ -107,9 +107,34 @@ async def _vm_state(token: str | None = None) -> dict | None:
             )
         if r.status_code == 404:
             return {"status": "NOT_FOUND"}
+        if r.status_code == 403:
+            # The most likely prod misconfiguration: the VM exists but the
+            # Cloud Run service account lacks compute.instances.* — say so
+            # instead of showing a blank "UNKNOWN".
+            return {"status": "FORBIDDEN",
+                    "error": "The backend's service account can't read this VM. "
+                             "Terraform grants difyVmOperator when with_dify=true; "
+                             "re-run ./deploy.sh."}
         if r.status_code != 200:
             return {"status": "UNKNOWN", "error": r.text[:200]}
-        return {"status": r.json().get("status", "UNKNOWN")}
+
+        data = r.json()
+        status_now = data.get("status", "UNKNOWN")
+        ip = ""
+        for nic in data.get("networkInterfaces") or []:
+            for cfg in nic.get("accessConfigs") or []:
+                ip = cfg.get("natIP") or ip
+        return {
+            "status": status_now,
+            "ip": ip,
+            "machine_type": (data.get("machineType") or "").rsplit("/", 1)[-1],
+            # GCE reports these while a start/stop is still settling; the UI
+            # keeps polling instead of showing a state that's about to change.
+            "transitioning": status_now in (
+                "PROVISIONING", "STAGING", "STOPPING", "SUSPENDING", "REPAIRING",
+            ),
+            "billing": "billed while RUNNING; stopped instances bill only for disk",
+        }
     except Exception as exc:
         return {"status": "UNKNOWN", "error": str(exc)[:200]}
 
