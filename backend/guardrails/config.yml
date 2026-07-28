@@ -1,5 +1,5 @@
 # NeMo Guardrails configuration.
-# The main LLM is injected programmatically in fast_api_app.py (so the same
+# The main LLM is injected programmatically in app.py (so the same
 # rails work against Ollama locally and Vertex AI in prod) — hence no
 # `models:` block with an engine here.
 

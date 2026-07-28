@@ -57,7 +57,7 @@ No Google Cloud yet? `./start.sh --no-auth` + `LLM_PROVIDER=mock` in
 
 | File | What it does | Touch it when… |
 |---|---|---|
-| `fast_api_app.py` | The entry point. Defines every route (`/api/chat`, `/api/conversations`, …), wires everything together at startup (the `lifespan` function). | adding/changing API endpoints |
+| `app.py` | The entry point. Defines every route (`/api/chat`, `/api/conversations`, …), wires everything together at startup (the `lifespan` function). | adding/changing API endpoints |
 | `auth.py` | Verifies the Firebase login token on every request; defines user tiers (free/pro/admin) and the `ADMIN_EMAILS` allowlist. | changing who can do what |
 | `providers.py` | Builds the actual LLM client — Gemini (`vertexai`), local (`ollama`), or fake (`mock`). One function, one switch. | adding a new AI provider |
 | `models_registry.py` | The catalog of models users can pick in the chat dropdown. Stored in Firestore, managed from the admin UI, tier-gated. Each model gets wrapped in guardrails, lazily, once. | changing how models are resolved/cached |
@@ -112,7 +112,7 @@ stays reviewable.
 
 **Add an API endpoint**
 ```python
-# fast_api_app.py (must start with /api/ — the prod proxy only forwards /api/**)
+# app.py (must start with /api/ — the prod proxy only forwards /api/**)
 @app.get("/api/hello")
 async def hello(user: AuthedUser = Depends(verify_firebase_token)):
     return {"hi": user.uid}   # ALWAYS scope data by user.uid

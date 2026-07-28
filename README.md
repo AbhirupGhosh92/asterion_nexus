@@ -138,9 +138,9 @@ placeholder model.
 |---|---|
 | Change usage limits | Admin panel → QUOTAS (tiers) or OPERATIVES (per user) |
 | Add a chat model | Admin panel → MODEL GRID (no code) |
-| Add an LLM provider | One branch in `backend/providers.py` |
+| Add an LLM provider | One branch in `backend/providers/llm.py` |
 | Create an agent | Admin panel → AGENT FORGE (no code) |
-| Add an agent tool | Install the Dify plugin + one `TOOL_CATALOG` entry in `backend/dify.py` |
+| Add an agent tool | Install the Dify plugin + one `TOOL_CATALOG` entry in `backend/providers/dify.py` |
 | Connect an MCP server | Admin panel → MCP LINKS → paste URL (no code) |
 | Tune safety rules | Edit the plain-English prompts in `backend/guardrails/config.yml` |
 | Re-theme the UI | Edit CSS variables in `frontend/src/theme.css` |

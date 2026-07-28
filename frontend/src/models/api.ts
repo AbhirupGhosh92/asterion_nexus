@@ -11,6 +11,23 @@
  */
 
 import type { User } from "firebase/auth";
+import type {
+  AdminModel,
+  AdminUser,
+  AgentStep,
+  ChatMessage,
+  ConversationMeta,
+  EngineStatus,
+  McpServer,
+  ModelOption,
+  Profile,
+  QuotaConfig,
+  QuotaStatus,
+  StreamCallbacks,
+  UploadMeta,
+} from "./types";
+
+export type * from "./types";
 
 // Firebase is optional in local dev: without VITE_FIREBASE_API_KEY the app
 // runs unauthenticated against a backend started with AUTH_DISABLED=1.
@@ -72,30 +89,6 @@ async function currentUser(): Promise<User | null> {
   });
 }
 
-export interface ModelOption {
-  id: string;
-  label: string;
-  provider: string;
-}
-
-export interface QuotaStatus {
-  used: number;
-  limit: number; // -1 = unlimited
-  remaining: number;
-  period: string; // YYYY-MM
-  resets_on: string; // YYYY-MM-DD
-  enforced: boolean;
-}
-
-export interface Profile {
-  uid: string;
-  email: string | null;
-  tier: string;
-  is_admin: boolean;
-  models: ModelOption[];
-  quota: QuotaStatus;
-}
-
 export async function fetchProfile(): Promise<Profile | null> {
   const res = await authedFetch("/api/me");
   if (!res.ok) return null;
@@ -105,13 +98,6 @@ export async function fetchProfile(): Promise<Profile | null> {
 // ---------------------------------------------------------------------------
 // Uploads (image / audio / video → Firebase Storage via the backend)
 // ---------------------------------------------------------------------------
-
-export interface UploadMeta {
-  id: string;
-  name: string;
-  content_type: string;
-  size: number;
-}
 
 const blobUrlCache = new Map<string, string>();
 
@@ -137,33 +123,6 @@ export async function uploadFile(file: File): Promise<UploadMeta> {
 // ---------------------------------------------------------------------------
 // Admin control plane
 // ---------------------------------------------------------------------------
-
-export interface AdminUser {
-  uid: string;
-  email: string | null;
-  display_name: string | null;
-  tier: string;
-  disabled: boolean;
-  last_sign_in: number | null;
-  quota_used?: number;
-  quota_limit?: number;
-  quota_override?: number | null;
-}
-
-export interface QuotaConfig {
-  enabled: boolean;
-  limits: Record<string, number>;
-}
-
-export interface AdminModel {
-  id: string;
-  label: string;
-  provider: string;
-  model: string;
-  min_tier: string;
-  enabled: boolean;
-  extra: Record<string, string>;
-}
 
 export const adminApi = {
   listUsers: async (): Promise<AdminUser[]> => {
@@ -289,27 +248,6 @@ export const adminApi = {
   },
 };
 
-export interface EngineStatus {
-  mode: "docker" | "vm" | "external" | "none";
-  configured: boolean;
-  base_url: string;
-  controllable: boolean;
-  reachable: boolean;
-  plugins: string[];
-  tools: number;
-  mcp_servers: number;
-  agents: number;
-  containers?: { running: number; total: number; names?: string[]; error?: string };
-  vm?: { status: string; error?: string };
-}
-
-export interface McpServer {
-  provider_id: string;
-  name: string;
-  server_url: string;
-  tools: string[];
-}
-
 // ---------------------------------------------------------------------------
 // Auth session helpers
 // ---------------------------------------------------------------------------
@@ -359,20 +297,7 @@ export function watchAuth(cb: (user: User | null) => void): () => void {
 // API surface
 // ---------------------------------------------------------------------------
 
-export interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  steps?: AgentStep[];
-}
-
 /** One autonomous decision an agent made: why, which tool, and what it got. */
-export interface AgentStep {
-  position: number;
-  thought?: string;
-  tool?: string;
-  tool_input?: string;
-  observation?: string;
-}
 
 export async function chat(messages: ChatMessage[], conversationId?: string) {
   const res = await authedFetch("/api/chat", {
@@ -385,16 +310,6 @@ export async function chat(messages: ChatMessage[], conversationId?: string) {
     conversation_id: string | null;
     guardrail_triggered: boolean;
   }>;
-}
-
-export interface StreamCallbacks {
-  onToken: (token: string) => void;
-  /** Fired first with the (possibly newly created) conversation id. */
-  onMeta?: (conversationId: string | null) => void;
-  /** Fired when a new conversation gets its generated title. */
-  onTitle?: (title: string) => void;
-  /** Fired each time an agent completes a tool decision. */
-  onStep?: (step: AgentStep) => void;
 }
 
 /** Streaming chat over SSE. Events are JSON: token / meta / title / done. */
@@ -444,13 +359,6 @@ export async function chatStream(
 // ---------------------------------------------------------------------------
 // Conversation history
 // ---------------------------------------------------------------------------
-
-export interface ConversationMeta {
-  id: string;
-  title: string;
-  updated_at: string | null;
-  message_count: number;
-}
 
 export async function listConversations(): Promise<ConversationMeta[]> {
   const res = await authedFetch("/api/conversations");

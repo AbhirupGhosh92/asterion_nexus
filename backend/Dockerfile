@@ -11,4 +11,4 @@ COPY . .
 
 # Cloud Run injects $PORT (defaults to 8080)
 ENV PORT=8080
-CMD ["sh", "-c", "uvicorn fast_api_app:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT}"]

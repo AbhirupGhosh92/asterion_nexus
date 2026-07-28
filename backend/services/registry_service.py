@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from google.cloud import firestore
 
-from auth import TIER_RANK
-from providers import MockRails, build_chat_llm
+from core.auth import TIER_RANK
+from providers.llm import MockRails, build_chat_llm
 
 log = logging.getLogger("ai-platform.models")
 
@@ -143,14 +143,14 @@ class ModelRegistry:
             screen_rails = LLMRails(self._rails_config, llm=screen_llm)
 
             if spec["provider"] == "dify":
-                from dify import DifyRails
+                from providers.dify import DifyRails
 
                 if self.dify is None or not self.dify.enabled:
                     raise HTTPException(503, "Dify is not configured")
                 extra = spec.get("extra") or {}
                 return DifyRails(self.dify, extra["api_key"], screen_rails), None
 
-            from imagegen import ImageGenRails
+            from providers.image_rails import ImageGenRails
 
             if self.media is None or not self.media.enabled:
                 raise HTTPException(503, "Media storage not configured")

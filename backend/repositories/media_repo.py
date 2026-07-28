@@ -1,5 +1,5 @@
 """
-Media uploads — images/audio/video in Firebase Storage (GCS).
+Media storage — images/audio/video in Firebase Storage (GCS).
 
 All access is server-side with Admin credentials; objects live under
 uploads/{uid}/... and every route scopes by the verified uid, so users can
@@ -14,15 +14,10 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from fastapi.responses import Response
 from google.cloud import firestore, storage
 
-from auth import AuthedUser, verify_firebase_token
 
 log = logging.getLogger("ai-platform.uploads")
-
-router = APIRouter(prefix="/api/uploads")
 
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 ALLOWED_PREFIXES = ("image/", "audio/", "video/")
@@ -78,39 +73,3 @@ class MediaStore:
              "size": d.get("size")}
             async for d in query.stream()
         ]
-
-
-def _store(request: Request) -> MediaStore:
-    store: MediaStore = request.app.state.media
-    if not store.enabled:
-        raise HTTPException(503, "Media storage not configured")
-    return store
-
-
-@router.post("")
-async def upload(
-    file: UploadFile, request: Request, user: AuthedUser = Depends(verify_firebase_token)
-):
-    content_type = file.content_type or ""
-    if not content_type.startswith(ALLOWED_PREFIXES):
-        raise HTTPException(415, "Only image, audio, and video files are accepted")
-    data = await file.read()
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, f"File exceeds {MAX_BYTES // (1024*1024)} MB limit")
-    return await _store(request).save(user.uid, file.filename or "upload", content_type, data)
-
-
-@router.get("")
-async def list_uploads(request: Request, user: AuthedUser = Depends(verify_firebase_token)):
-    return await _store(request).list(user.uid)
-
-
-@router.get("/{file_id}/content")
-async def get_content(
-    file_id: str, request: Request, user: AuthedUser = Depends(verify_firebase_token)
-):
-    found = await _store(request).get(user.uid, file_id)
-    if found is None:
-        raise HTTPException(404, "File not found")
-    meta, data = found
-    return Response(content=data, media_type=meta["content_type"])

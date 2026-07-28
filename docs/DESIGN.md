@@ -95,7 +95,7 @@ the propagated headers authorize the *user*.
 ai_platform/
 ├── infra/main.tf              # Terraform: Artifact Registry, secrets, Cloud Run
 ├── backend/
-│   ├── fast_api_app.py        # entry point: routes, guardrails wiring, memory
+│   ├── app.py        # entry point: routes, guardrails wiring, memory
 │   ├── auth.py                # Firebase token verify + RBAC tiers
 │   ├── providers.py           # vertexai | ollama | mock switch (one env var)
 │   ├── memory.py              # Vertex AI Memory Bank wrapper (no-op offline)
@@ -410,7 +410,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-LLM_PROVIDER=ollama AUTH_DISABLED=1 uvicorn fast_api_app:app --reload --port 8080
+LLM_PROVIDER=ollama AUTH_DISABLED=1 uvicorn app:app --reload --port 8080
 
 # 3. Frontend
 cd frontend && pnpm install && pnpm dev   # hits localhost:8080 directly in dev
