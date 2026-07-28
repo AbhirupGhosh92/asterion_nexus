@@ -1,0 +1,45 @@
+/* --- HUD header --- */
+.hud {
+  flex-shrink: 0; /* header and composer stay put; only .chat scrolls */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--bg-raised), var(--bg-panel));
+}
+
+.hud-brand {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+  text-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 50%, transparent);
+}
+
+.hud-glyph { color: var(--neon-cyan); }
+.hud-dim { color: var(--text-dim); }
+
+.hud-status { display: flex; gap: 8px; }
+
+.hud-chip {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border: 1px solid var(--border-dim);
+  border-radius: 999px;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-tier { color: var(--neon-amber); border-color: color-mix(in srgb, var(--neon-amber) 35%, transparent); }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot-on { background: var(--neon-lime); box-shadow: var(--glow-sm) var(--neon-lime); }
+.dot-off { background: var(--neon-magenta); box-shadow: var(--glow-sm) var(--neon-magenta); }
+

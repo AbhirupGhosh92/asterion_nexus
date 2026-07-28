@@ -1,0 +1,153 @@
+/* --- Code panels: language label, copy button, highlighted body --- */
+.code-panel {
+  margin: 0 0 0.7em;
+  max-width: 100%;
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  background: var(--bg-void);
+  overflow: hidden; /* keep the body's scrollbar inside the rounded corners */
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px 5px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  opacity: 0.75;
+}
+
+.code-copy {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  /* Always visible: a code panel is often the whole reason for the message,
+     and hover-only controls are unreachable on touch. */
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.code-copy:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+
+.code-body {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+/* No bare `.md pre` rule: Markdown replaces `pre` with the code panel, so
+   one would only fight .code-body (and win, on specificity). */
+.code-body code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  white-space: pre;
+}
+
+.md blockquote {
+  margin: 0 0 0.7em;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid color-mix(in srgb, var(--neon-magenta) 50%, transparent);
+  color: var(--text-dim);
+}
+
+.md hr {
+  border: none;
+  border-top: 1px solid var(--border-dim);
+  margin: 1em 0;
+}
+
+.md-table-wrap { overflow-x: auto; margin: 0 0 0.8em; }
+
+.md table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 100%;
+}
+
+.md th {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-align: left;
+  padding: 7px 11px;
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--neon-cyan) 22%, transparent);
+  white-space: nowrap;
+}
+
+.md td {
+  padding: 7px 11px;
+  border: 1px solid var(--border-dim);
+  vertical-align: top;
+}
+
+.md tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+
+/* --- Syntax highlighting (highlight.js classes, cyberpunk palette) ---
+   Hand-mapped instead of importing an hljs theme so code sits in the same
+   four-colour system as the rest of the UI and ships no extra CSS. */
+.hljs-comment,
+.hljs-quote { color: var(--text-dim); font-style: italic; opacity: 0.8; }
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name,
+.hljs-tag { color: var(--neon-magenta); }
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition { color: var(--neon-lime); }
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta { color: var(--neon-amber); }
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-built_in { color: var(--neon-cyan); }
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-template-variable { color: #7fd4ff; }
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ { color: #ffd98a; }
+
+.hljs-params,
+.hljs-punctuation,
+.hljs-operator { color: var(--text-primary); }
+
+.hljs-deletion { color: var(--neon-magenta); opacity: 0.85; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+.hljs-link { text-decoration: underline; }
+

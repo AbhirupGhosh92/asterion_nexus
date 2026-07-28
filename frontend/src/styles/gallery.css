@@ -1,0 +1,272 @@
+/* --- Homepage: specialist agent gallery --- */
+.home { margin: auto; width: 100%; max-width: 920px; }
+
+.gallery { margin-top: 34px; }
+
+.gallery-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.gallery-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+}
+
+.gallery-sub {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: 12px;
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  text-align: left;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.agent-card:hover:not(:disabled) {
+  border-color: var(--neon-cyan);
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  transform: translateY(-2px);
+}
+
+.agent-card-active {
+  border-color: var(--neon-lime);
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-lime) 35%, transparent);
+}
+
+.agent-card-locked { border-style: dashed; }
+.agent-card-locked:hover { border-color: var(--neon-amber); box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-amber) 40%, transparent); }
+.agent-card-locked .agent-brief { opacity: 0.55; }
+
+.agent-card-offline { opacity: 0.45; cursor: not-allowed; }
+
+.agent-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.agent-name {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.agent-badge {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.agent-badge-pro { color: var(--neon-amber); }
+.agent-badge-on { color: var(--neon-lime); }
+
+.agent-brief {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  /* Briefings are whole system prompts — show the opening lines only. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agent-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.agent-tool {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+.agent-cta {
+  margin-top: auto;
+  padding-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--neon-cyan);
+}
+
+.agent-card-locked .agent-cta { color: var(--neon-amber); }
+.agent-card-active .agent-cta { color: var(--neon-lime); }
+
+.hud-upgrade {
+  color: var(--neon-amber);
+  border-color: color-mix(in srgb, var(--neon-amber) 45%, transparent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.hud-upgrade:hover {
+  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-amber) 50%, transparent);
+}
+
+/* --- Pro upgrade dialog (placeholder until billing exists) --- */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 4, 10, 0.78);
+  backdrop-filter: blur(3px);
+}
+
+.upgrade-card {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px 26px 22px;
+  text-align: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--neon-amber);
+  border-radius: 8px;
+  box-shadow: var(--glow-md) color-mix(in srgb, var(--neon-amber) 30%, transparent);
+}
+
+.upgrade-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.upgrade-x:hover { color: var(--neon-magenta); }
+
+.upgrade-glyph {
+  font-size: 1.6rem;
+  color: var(--neon-amber);
+  text-shadow: var(--glow-md) color-mix(in srgb, var(--neon-amber) 55%, transparent);
+}
+
+.upgrade-title {
+  margin: 6px 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.22em;
+}
+
+.upgrade-lede {
+  margin: 0 0 20px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.upgrade-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  text-align: left;
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--bg-void);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+}
+
+.plan-featured {
+  border-color: var(--neon-amber);
+  box-shadow: inset 0 0 22px rgba(255, 181, 46, 0.05);
+}
+
+.plan-name {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+}
+
+.plan-featured .plan-name { color: var(--neon-amber); }
+
+.plan-price {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin: 4px 0 12px;
+}
+
+.plan-per { font-size: 0.65rem; color: var(--text-dim); }
+
+.plan-perks {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-dim);
+}
+
+.plan-perks li::before { content: "▸ "; color: var(--neon-lime); }
+.plan-perk-off { opacity: 0.45; text-decoration: line-through; }
+.plan-perk-off::before { content: "✕ "; color: var(--neon-magenta) !important; }
+
+.plan-cta {
+  margin-top: auto;
+  padding: 9px 0;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  border-radius: 4px;
+  border: 1px solid var(--neon-amber);
+  background: color-mix(in srgb, var(--neon-amber) 14%, transparent);
+  color: var(--neon-amber);
+  cursor: not-allowed;
+}
+
+.plan-cta-current {
+  border-color: var(--border-dim);
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.upgrade-note {
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  opacity: 0.8;
+}

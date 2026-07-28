@@ -1,0 +1,88 @@
+/* --- Sidebar (topics) --- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 260px;
+  padding: 16px 12px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-dim);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+/* Desktop collapse: the ☰ button shrinks the column to nothing. */
+.layout-collapsed .sidebar {
+  width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-right: none;
+}
+
+.new-chat { padding: 10px 0; width: 100%; }
+
+.conv-list { display: flex; flex-direction: column; gap: 4px; }
+
+.conv-empty {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.conv-item:hover { background: var(--bg-raised); color: var(--text-primary); }
+
+.conv-active {
+  background: var(--bg-raised);
+  border-color: color-mix(in srgb, var(--neon-cyan) 35%, transparent);
+  color: var(--text-primary);
+}
+
+.conv-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conv-delete {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+
+.conv-item:hover .conv-delete { opacity: 0.7; }
+.conv-delete:hover { color: var(--neon-magenta); opacity: 1; }
+
+.scrim { display: none; }
+
+.hud-left { display: flex; align-items: center; gap: 10px; }
+
+.hamburger {
+  display: inline-flex;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--neon-cyan);
+}
+
