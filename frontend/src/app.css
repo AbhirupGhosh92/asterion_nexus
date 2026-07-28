@@ -209,6 +209,10 @@ html, body, #root { height: 100%; }
 
 .msg-body {
   display: inline-block;
+  /* inline-block is shrink-to-fit, i.e. sized to max-content — without this
+     a long code line widens the bubble past the viewport instead of
+     scrolling inside its panel. */
+  max-width: 100%;
   text-align: left;
   padding: 10px 14px;
   border-radius: 6px;
@@ -771,16 +775,61 @@ html, body, #root { height: 100%; }
   color: var(--neon-cyan);
 }
 
-.md pre {
+/* --- Code panels: language label, copy button, highlighted body --- */
+.code-panel {
   margin: 0 0 0.7em;
-  padding: 10px 12px;
+  max-width: 100%;
+  border: 1px solid var(--border-dim);
   border-radius: 6px;
   background: var(--bg-void);
+  overflow: hidden; /* keep the body's scrollbar inside the rounded corners */
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px 5px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  opacity: 0.75;
+}
+
+.code-copy {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 3px 9px;
+  border-radius: 999px;
   border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  /* Always visible: a code panel is often the whole reason for the message,
+     and hover-only controls are unreachable on touch. */
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.code-copy:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+
+.code-body {
+  margin: 0;
+  padding: 10px 12px;
   overflow-x: auto;
 }
 
-.md pre code {
+/* No bare `.md pre` rule: Markdown replaces `pre` with the code panel, so
+   one would only fight .code-body (and win, on specificity). */
+.code-body code {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.5;
@@ -1130,275 +1179,48 @@ html, body, #root { height: 100%; }
   .img-download { opacity: 0.85; }
 }
 
-/* --- Homepage: specialist agent gallery --- */
-.home { margin: auto; width: 100%; max-width: 920px; }
+/* --- Syntax highlighting (highlight.js classes, cyberpunk palette) ---
+   Hand-mapped instead of importing an hljs theme so code sits in the same
+   four-colour system as the rest of the UI and ships no extra CSS. */
+.hljs-comment,
+.hljs-quote { color: var(--text-dim); font-style: italic; opacity: 0.8; }
 
-.gallery { margin-top: 34px; }
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name,
+.hljs-tag { color: var(--neon-magenta); }
 
-.gallery-head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--border-dim);
-}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition { color: var(--neon-lime); }
 
-.gallery-title {
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  color: var(--neon-cyan);
-  text-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 45%, transparent);
-}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta { color: var(--neon-amber); }
 
-.gallery-sub {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--text-dim);
-}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-built_in { color: var(--neon-cyan); }
 
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
-  gap: 12px;
-}
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-template-variable { color: #7fd4ff; }
 
-.agent-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  text-align: left;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-dim);
-  border-radius: 6px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-}
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ { color: #ffd98a; }
 
-.agent-card:hover:not(:disabled) {
-  border-color: var(--neon-cyan);
-  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-cyan) 40%, transparent);
-  transform: translateY(-2px);
-}
+.hljs-params,
+.hljs-punctuation,
+.hljs-operator { color: var(--text-primary); }
 
-.agent-card-active {
-  border-color: var(--neon-lime);
-  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-lime) 35%, transparent);
-}
-
-.agent-card-locked { border-style: dashed; }
-.agent-card-locked:hover { border-color: var(--neon-amber); box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-amber) 40%, transparent); }
-.agent-card-locked .agent-brief { opacity: 0.55; }
-
-.agent-card-offline { opacity: 0.45; cursor: not-allowed; }
-
-.agent-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-.agent-name {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-.agent-badge {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.1em;
-  padding: 2px 7px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-}
-
-.agent-badge-pro { color: var(--neon-amber); }
-.agent-badge-on { color: var(--neon-lime); }
-
-.agent-brief {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  line-height: 1.5;
-  color: var(--text-dim);
-  /* Briefings are whole system prompts — show the opening lines only. */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.agent-tools { display: flex; flex-wrap: wrap; gap: 5px; }
-
-.agent-tool {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: var(--bg-raised);
-  color: var(--text-dim);
-}
-
-.agent-cta {
-  margin-top: auto;
-  padding-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  color: var(--neon-cyan);
-}
-
-.agent-card-locked .agent-cta { color: var(--neon-amber); }
-.agent-card-active .agent-cta { color: var(--neon-lime); }
-
-.hud-upgrade {
-  color: var(--neon-amber);
-  border-color: color-mix(in srgb, var(--neon-amber) 45%, transparent);
-  background: transparent;
-  cursor: pointer;
-}
-
-.hud-upgrade:hover {
-  box-shadow: var(--glow-sm) color-mix(in srgb, var(--neon-amber) 50%, transparent);
-}
-
-/* --- Pro upgrade dialog (placeholder until billing exists) --- */
-.modal-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(4, 4, 10, 0.78);
-  backdrop-filter: blur(3px);
-}
-
-.upgrade-card {
-  position: relative;
-  width: min(720px, 100%);
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 28px 26px 22px;
-  text-align: center;
-  background: var(--bg-panel);
-  border: 1px solid var(--neon-amber);
-  border-radius: 8px;
-  box-shadow: var(--glow-md) color-mix(in srgb, var(--neon-amber) 30%, transparent);
-}
-
-.upgrade-x {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.upgrade-x:hover { color: var(--neon-magenta); }
-
-.upgrade-glyph {
-  font-size: 1.6rem;
-  color: var(--neon-amber);
-  text-shadow: var(--glow-md) color-mix(in srgb, var(--neon-amber) 55%, transparent);
-}
-
-.upgrade-title {
-  margin: 6px 0 4px;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  letter-spacing: 0.22em;
-}
-
-.upgrade-lede {
-  margin: 0 0 20px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-dim);
-}
-
-.upgrade-plans {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-  text-align: left;
-}
-
-.plan {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  background: var(--bg-void);
-  border: 1px solid var(--border-dim);
-  border-radius: 6px;
-}
-
-.plan-featured {
-  border-color: var(--neon-amber);
-  box-shadow: inset 0 0 22px rgba(255, 181, 46, 0.05);
-}
-
-.plan-name {
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  color: var(--text-dim);
-}
-
-.plan-featured .plan-name { color: var(--neon-amber); }
-
-.plan-price {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  margin: 4px 0 12px;
-}
-
-.plan-per { font-size: 0.65rem; color: var(--text-dim); }
-
-.plan-perks {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  color: var(--text-dim);
-}
-
-.plan-perks li::before { content: "▸ "; color: var(--neon-lime); }
-.plan-perk-off { opacity: 0.45; text-decoration: line-through; }
-.plan-perk-off::before { content: "✕ "; color: var(--neon-magenta) !important; }
-
-.plan-cta {
-  margin-top: auto;
-  padding: 9px 0;
-  font-family: var(--font-display);
-  font-size: 0.65rem;
-  letter-spacing: 0.16em;
-  border-radius: 4px;
-  border: 1px solid var(--neon-amber);
-  background: color-mix(in srgb, var(--neon-amber) 14%, transparent);
-  color: var(--neon-amber);
-  cursor: not-allowed;
-}
-
-.plan-cta-current {
-  border-color: var(--border-dim);
-  background: transparent;
-  color: var(--text-dim);
-}
-
-.upgrade-note {
-  margin: 16px 0 0;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--text-dim);
-  opacity: 0.8;
-}
+.hljs-deletion { color: var(--neon-magenta); opacity: 0.85; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+.hljs-link { text-decoration: underline; }
