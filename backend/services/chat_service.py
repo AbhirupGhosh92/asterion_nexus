@@ -186,6 +186,18 @@ class ChatService:
     # ---- streaming turn ---------------------------------------------------
 
     async def stream(self, body: ChatRequest, user):
+        """Resolve the turn, then hand back the SSE generator.
+
+        Resolution happens *before* the response starts on purpose: once
+        StreamingResponse has sent its headers, an HTTPException can only
+        truncate the body, so a caller asking for a model above their tier
+        would see an empty 200 instead of a 403. Awaiting here keeps that
+        error a real status code.
+        """
+        prepared = await self._prepare(body, user)
+        return self._stream_frames(body, user, *prepared)
+
+    async def _stream_frames(self, body: ChatRequest, user, rails, raw_llm, messages, multimodal):
         """
         Yields SSE frames:
           meta  → the (possibly new) conversation id, sent first
@@ -194,7 +206,6 @@ class ChatService:
           title → generated title, new conversations only
           done
         """
-        rails, raw_llm, messages, multimodal = await self._prepare(body, user)
         user_text = messages[-1]["content"]
 
         def frame(payload: dict) -> str:
