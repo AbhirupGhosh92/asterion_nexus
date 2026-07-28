@@ -23,6 +23,7 @@ import type {
   Profile,
   QuotaConfig,
   QuotaStatus,
+  SpecialistAgent,
   StreamCallbacks,
   UploadMeta,
 } from "./types";
@@ -354,6 +355,17 @@ export async function chatStream(
       else if (payload.type === "done") return;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Specialist agents (homepage gallery)
+// ---------------------------------------------------------------------------
+
+/** The full roster, including agents above the caller's tier (`locked`). */
+export async function listSpecialistAgents(): Promise<SpecialistAgent[]> {
+  const res = await authedFetch("/api/agents");
+  if (!res.ok) return []; // no engine / no agents forged yet — just show nothing
+  return res.json();
 }
 
 // ---------------------------------------------------------------------------

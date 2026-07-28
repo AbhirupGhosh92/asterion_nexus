@@ -25,6 +25,20 @@ log = logging.getLogger("ai-platform.models")
 
 PROVIDERS = ("vertexai", "ollama", "mock", "dify", "vertexai_image")
 
+# Specialist agents (provider="dify") are a Pro capability. A per-agent
+# min_tier can raise the bar (admin-only agents) but never lower it — so the
+# homepage gallery and the composer's model list can't disagree about who may
+# run one.
+AGENT_FLOOR_TIER = "pro"
+
+
+def effective_min_tier(spec: dict) -> str:
+    """The tier actually required for a model, applying the agent floor."""
+    min_tier = spec.get("min_tier", "free")
+    if spec.get("provider") != "dify":
+        return min_tier
+    return min_tier if TIER_RANK.get(min_tier, 0) > TIER_RANK[AGENT_FLOOR_TIER] else AGENT_FLOOR_TIER
+
 
 class ModelRegistry:
     def __init__(self, project: str, region: str, guardrails_config_path: str):
@@ -81,9 +95,40 @@ class ModelRegistry:
             {"id": m["id"], "label": m["label"], "provider": m["provider"]}
             for m in await self.list_all()
             if m.get("enabled")
-            and rank >= TIER_RANK.get(m.get("min_tier", "free"), 0)
+            and rank >= TIER_RANK.get(effective_min_tier(m), 0)
             and (m.get("provider") != "dify" or dify_up)
         ]
+
+    async def list_agents(self, tier: str) -> list[dict]:
+        """The specialist-agent roster for the homepage gallery.
+
+        Unlike `list_for_tier`, this deliberately does NOT hide agents above
+        the caller's tier — free users are meant to see what Pro unlocks, so
+        each entry carries a `locked` flag instead of vanishing. That is a
+        display hint only: `get_rails` still 403s on a locked id, so forging
+        `locked: false` client-side buys nothing.
+        """
+        rank = TIER_RANK.get(tier, 0)
+        online = self.dify is not None and await self.dify.is_up()
+        out = []
+        for m in await self.list_all():
+            if m.get("provider") != "dify" or not m.get("enabled"):
+                continue
+            extra = m.get("extra") or {}
+            min_tier = effective_min_tier(m)
+            brief = (extra.get("instructions") or "").strip()
+            out.append({
+                "id": m["id"],
+                "label": m["label"],
+                # The system prompt doubles as the card blurb; cap it so a
+                # long one doesn't bloat every homepage load.
+                "description": brief[:400] + ("…" if len(brief) > 400 else ""),
+                "tools": [t for t in (extra.get("tools") or "").split(",") if t],
+                "min_tier": min_tier,
+                "locked": rank < TIER_RANK.get(min_tier, 0),
+                "online": online,
+            })
+        return out
 
     async def upsert(self, model_id: str, spec: dict) -> None:
         if spec.get("provider") not in PROVIDERS:

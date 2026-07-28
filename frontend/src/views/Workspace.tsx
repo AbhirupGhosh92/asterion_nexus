@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { FIREBASE_ENABLED, signOutUser } from "../models/api";
+import type { SpecialistAgent } from "../models/types";
+import { useAgents } from "../viewmodels/useAgents";
 import { useChat } from "../viewmodels/useChat";
 import { useConversations } from "../viewmodels/useConversations";
 import AdminPanel from "./admin/AdminPanel";
+import AgentGallery from "./AgentGallery";
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
 import Sidebar from "./Sidebar";
+import UpgradeDialog from "./UpgradeDialog";
 
 /**
  * The signed-in shell: sidebar + chat + composer, or the admin panel.
@@ -20,10 +24,14 @@ export default function Workspace({ user }: { user: User | null }) {
     onConversationsChanged: convos.refresh,
   });
 
+  const { agents } = useAgents(chat.profile?.tier);
+
   const [health, setHealth] = useState<{ provider: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop collapse
   const [showAdmin, setShowAdmin] = useState(false);
+  // Which locked agent triggered the upgrade dialog (null agent = generic).
+  const [upgrade, setUpgrade] = useState<{ agent: SpecialistAgent | null } | null>(null);
 
   useEffect(() => {
     convos.refresh();
@@ -50,6 +58,12 @@ export default function Workspace({ user }: { user: User | null }) {
   async function removeConversation(id: string) {
     await convos.remove(id);
     if (id === convos.activeId) newChat();
+  }
+
+  /** Point the next turn at this agent; the composer stays where it is. */
+  function deployAgent(agent: SpecialistAgent) {
+    chat.setModel(agent.id);
+    chat.composerRef.current?.focus();
   }
 
   const { profile } = chat;
@@ -93,6 +107,15 @@ export default function Workspace({ user }: { user: User | null }) {
                 ⚡ {profile.quota.remaining}/{profile.quota.limit}
               </span>
             )}
+            {profile?.tier === "free" && (
+              <button
+                className="hud-chip hud-upgrade"
+                title="See what PRO unlocks"
+                onClick={() => setUpgrade({ agent: null })}
+              >
+                ⬆ PRO
+              </button>
+            )}
             <span className="hud-chip hud-tier">{identity}</span>
             {profile?.is_admin && (
               <button
@@ -115,12 +138,20 @@ export default function Workspace({ user }: { user: User | null }) {
         ) : (
           <main className="chat terminal-panel" ref={chat.scrollRef} onScroll={chat.handleScroll}>
             {chat.messages.length === 0 && (
-              <div className="empty">
-                <div className="empty-glyph">◢◤</div>
-                <p>CHANNEL OPEN. TRANSMIT WHEN READY.</p>
-                <p className="empty-sub">
-                  auth → guardrails → model → memory · every message rides the full pipeline
-                </p>
+              <div className="home">
+                <div className="empty">
+                  <div className="empty-glyph">◢◤</div>
+                  <p>CHANNEL OPEN. TRANSMIT WHEN READY.</p>
+                  <p className="empty-sub">
+                    auth → guardrails → model → memory · every message rides the full pipeline
+                  </p>
+                </div>
+                <AgentGallery
+                  agents={agents}
+                  activeId={chat.model}
+                  onDeploy={deployAgent}
+                  onLocked={(agent) => setUpgrade({ agent })}
+                />
               </div>
             )}
             {chat.messages.map((m, idx) => (
@@ -161,6 +192,14 @@ export default function Workspace({ user }: { user: User | null }) {
           />
         )}
       </div>
+
+      {upgrade && (
+        <UpgradeDialog
+          agent={upgrade.agent}
+          tier={profile?.tier ?? "free"}
+          onClose={() => setUpgrade(null)}
+        />
+      )}
     </div>
   );
 }

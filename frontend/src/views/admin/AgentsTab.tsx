@@ -4,7 +4,9 @@ import type {
   AdminModel, AdminUser, EngineStatus, McpServer, QuotaConfig,
 } from "../../models/types";
 
-const TIERS = ["free", "pro", "admin"];
+// Specialist agents are a Pro capability — the backend floors any lower
+// min_tier at "pro", so offering "free" here would be a lying control.
+const TIERS = ["pro", "admin"];
 const PROVIDERS = ["vertexai", "vertexai_image", "ollama", "mock"];
 const EMPTY_MODEL: AdminModel = {
   id: "", label: "", provider: "vertexai", model: "",
@@ -26,7 +28,7 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
     name: "",
     instructions: "",
     model: "gemini-2.5-flash",
-    min_tier: "free",
+    min_tier: "pro",
     tools: [] as string[],
   });
 
@@ -58,7 +60,7 @@ export default function AgentsTab({ onError }: { onError: (e: string | null) => 
         name: "",
         instructions: "",
         model: "gemini-2.5-flash",
-        min_tier: "free",
+        min_tier: "pro",
         tools: [],
       });
       refresh();

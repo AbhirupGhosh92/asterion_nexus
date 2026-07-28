@@ -29,6 +29,7 @@ async def chat_stream(
     request: Request,
     user: AuthedUser = Depends(require_quota),
 ):
-    return StreamingResponse(
-        request.app.state.chat.stream(body, user), media_type="text/event-stream"
-    )
+    # Awaited so model resolution (and its 403) happens before the response
+    # starts; the service returns the frame generator.
+    frames = await request.app.state.chat.stream(body, user)
+    return StreamingResponse(frames, media_type="text/event-stream")

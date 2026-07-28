@@ -29,7 +29,7 @@ from core.auth import AuthedUser, verify_firebase_token
 from repositories.chat_repo import ChatStore
 from repositories.media_repo import MediaStore
 from repositories.memory_repo import MemoryBank
-from routers import admin, chat, conversations, uploads
+from routers import admin, agents, chat, conversations, uploads
 from services.chat_service import ChatService
 from services.quota_service import QuotaStore, refund_on_server_error
 from services.registry_service import ModelRegistry
@@ -101,6 +101,7 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(uploads.router)
+app.include_router(agents.router)
 app.include_router(admin.router)
 
 
