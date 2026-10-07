@@ -4,7 +4,7 @@ python-multipart>=0.0.20
 pydantic>=2.8
 httpx>=0.27
 nemoguardrails>=0.14
-firebase-admin>=6.5
+firebase-admin>=7.5.0
 # GCP / Vertex AI (LLM + Agent Engine Memory Bank + Gemini image gen)
 google-cloud-aiplatform[agent_engines]>=1.95
 langchain-google-vertexai>=2.0
