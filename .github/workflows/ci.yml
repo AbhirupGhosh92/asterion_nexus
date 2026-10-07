@@ -14,7 +14,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Runs over the whole tree, not just the diff: the pre-commit hook can
       # be skipped with --no-verify, so this is the check that actually holds.
